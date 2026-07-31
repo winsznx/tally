@@ -69,11 +69,31 @@ attestation](packages/core/core/binding)), and clients re-verify every entry.
 
 ```sh
 pnpm install
-pnpm -r test        # vitest + fast-check, 110 tests
+pnpm -r test        # vitest + fast-check
 pnpm -r typecheck
 pnpm --filter @tally/app dev     # one origin; ?app=1 forces the app half
 pnpm --filter @tally/relay dev   # the relay
 ```
+
+## Deploying
+
+Everything runs on Cloudflare — Pages for the origin, Workers + D1 for the
+relay. From a clean checkout:
+
+```sh
+npx wrangler login      # the only interactive step
+./scripts/deploy.sh     # everything else, idempotent
+```
+
+Full details in [DEPLOY.md](DEPLOY.md).
+
+**There are no secrets in this repository, and none are needed.** No keys, no
+tokens, no `.env`. That is a deliberate property: the relay holds only signed
+public entries and is untrusted by design, the purse key is generated at runtime
+on the device and never leaves it, and the D1 database id is an account-scoped
+resource handle rather than a credential. Endpoints are injected at build time
+(`VITE_RELAY_URL`) so a preview build can point at a preview relay — not because
+they are sensitive.
 
 ## Ground rules
 

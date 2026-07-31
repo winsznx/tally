@@ -8,7 +8,9 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
-    "db:init": "wrangler d1 execute tally-relay --file=./schema.sql",
+    "db:create": "wrangler d1 create tally-relay",
+    "db:migrate": "wrangler d1 migrations apply tally-relay --remote",
+    "db:migrate:local": "wrangler d1 migrations apply tally-relay --local",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
@@ -20,6 +22,6 @@
     "@nimiq/core": "^2.7.2",
     "typescript": "^5.5.0",
     "vitest": "^2.1.0",
-    "wrangler": "^3.78.0"
+    "wrangler": "^4.0.0"
   }
 }

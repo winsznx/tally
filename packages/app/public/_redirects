@@ -1,0 +1,5 @@
+# Cloudflare Pages SPA fallback. Invite links are /l/<ledgerId>, which is a
+# client-side route with no file behind it — serve the app shell and let
+# src/shell/origin.ts parse the path. Status 200 (rewrite), not 302, so the
+# invite URL stays in the address bar and can be shared/QR-encoded as-is.
+/*    /index.html    200

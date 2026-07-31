@@ -9,8 +9,8 @@
  */
 import { getHostLanguage } from '@nimiq/mini-app-sdk';
 import { showNetworkChip } from '../adapters/network-guard.js';
-import { NimiqPayProvider } from '../adapters/provider.js';
 import { TESTNET, type NetworkId } from '../adapters/types.js';
+import { createServices } from './services.js';
 import type { LedgerViewModel } from '../state/ledger-state.js';
 import { Translator, normalizeLang } from '../shell/i18n.js';
 import { parseLedgerRoute } from '../shell/origin.js';
@@ -67,8 +67,8 @@ export async function mountApp(): Promise<void> {
   });
 
   // Connect the wallet in the background — the preview above is already visible.
-  const provider = new NimiqPayProvider(3000);
-  await provider.init();
+  const services = createServices(network);
+  await services.provider.init();
 }
 
 function render(

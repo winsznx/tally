@@ -2,13 +2,18 @@ name = "tally-relay"
 main = "src/index.ts"
 compatibility_date = "2024-09-09"
 
-# D1 binding. Create the database with:
-#   wrangler d1 create tally-relay
-# then paste the returned database_id below and run `pnpm db:init`.
+# The relay needs NO secrets and NO environment variables. It stores only signed
+# public entries, and it is untrusted by design — see README.md. There is
+# nothing here to leak, which is a deliberate property of the architecture.
+
+# D1 binding. `database_id` is filled in by scripts/deploy.sh (or by hand after
+# `pnpm --filter @tally/relay db:create`). The id is NOT a secret — it is an
+# account-scoped resource handle that is useless without your Cloudflare login.
 [[d1_databases]]
 binding = "DB"
 database_name = "tally-relay"
 database_id = "REPLACE_WITH_D1_DATABASE_ID"
+migrations_dir = "migrations"
 
 [observability]
 enabled = true
