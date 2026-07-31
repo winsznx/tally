@@ -42,6 +42,23 @@ account their purse is bound to. What it **does not**: that a given account
 belongs to the specific human you expect, or that the member set you were shown
 is complete. That gap is trust-on-first-use, below.
 
+## The invite link is a capability
+
+**Anyone holding a ledger's URL can read that entire tab from the relay** — its
+members, expenses, and settlements. There is no access control beyond knowing
+the id, which is 128 random bits (base32, unguessable).
+
+This is deliberate, not an oversight. For a 2-to-12 person tab shared among
+people who already know each other, an approval step would add friction to the
+60-second onboarding target for a threat model that does not warrant it — the
+tab's contents are already visible to everyone in it, and settlement amounts and
+addresses are public on-chain by construction.
+
+What it means in practice: **treat the link like the tab itself**. The app says
+so at the moment of sharing rather than leaving it to be discovered, and a link
+should only go to the people who are in the tab. Obligation descriptions and
+display names stay off-chain but ARE visible to anyone with the link.
+
 ## Trust on first use (TOFU) at member registration — known, accepted for v1
 
 When you open an invite and first sync a ledger, your client accepts the member

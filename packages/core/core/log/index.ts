@@ -25,6 +25,7 @@ import { MAX_ANCHOR_HEIGHT, MAX_LUNA, type AddressHex, type NettingMode, type Ob
 export type EntryType =
   | 'LEDGER_OPEN'
   | 'MEMBER_JOIN'
+  | 'MEMBER_LEAVE'
   | 'OBLIGATION_PROPOSE'
   | 'OBLIGATION_ACCEPT'
   | 'OBLIGATION_REJECT'
@@ -34,6 +35,7 @@ export type EntryType =
 const ENTRY_TYPES: ReadonlySet<string> = new Set([
   'LEDGER_OPEN',
   'MEMBER_JOIN',
+  'MEMBER_LEAVE',
   'OBLIGATION_PROPOSE',
   'OBLIGATION_ACCEPT',
   'OBLIGATION_REJECT',
@@ -205,6 +207,14 @@ function validatePayload(entryType: EntryType, payload: Record<string, unknown>)
       expect(['accountPublicKey', 'bindingSignature'], ['accountPublicKey', 'bindingSignature']);
       requireBindingFields();
       return;
+    case 'MEMBER_LEAVE':
+      // Leaving carries no binding — the member is already registered, and the
+      // shared purse-key guard proves the entry came from them.
+      expect(['reason'], []);
+      if ('reason' in payload && typeof payload['reason'] !== 'string') {
+        throw new LogError('MEMBER_LEAVE: reason must be a string');
+      }
+      return;
     case 'OBLIGATION_PROPOSE': {
       expect(['debtor', 'creditor', 'amount', 'memo'], ['debtor', 'creditor', 'amount']);
       const { debtor, creditor, amount } = payload;
@@ -363,8 +373,12 @@ export interface LedgerState {
   ledgerName: string | null;
   /** Entry hash of LEDGER_OPEN — the ledger genesis hash the anchor tag derives from. */
   genesisHash: string | null;
-  /** Sorted by address. */
-  members: { address: AddressHex; pursePublicKey: string }[];
+  /**
+   * Sorted by address. A member who has left stays listed with `active:
+   * false` — their unsettled edges remain visible and remain in netting until
+   * they settle, because the record follows the address (PRD 6).
+   */
+  members: { address: AddressHex; pursePublicKey: string; active: boolean }[];
   /** All obligations by propose entry ID, sorted by ID. */
   obligations: ObligationRecord[];
   /**
@@ -413,6 +427,7 @@ function canonicalOrder(entries: LogEntry[]): SortableEntry[] {
 export function replayState(entries: LogEntry[]): LedgerState {
   const ordered = canonicalOrder(entries);
   const members = new Map<AddressHex, string>();
+  const departed = new Set<AddressHex>();
   const obligations = new Map<string, ObligationRecord>();
   const acceptIdByPropose = new Map<string, string>();
   const ignored: IgnoredEntry[] = [];
@@ -439,11 +454,27 @@ export function replayState(entries: LogEntry[]): LedgerState {
   for (const s of ordered) {
     const e = s.entry;
     const registeredPk = members.get(e.authorAddress);
-    if (registeredPk !== undefined && registeredPk !== e.pursePublicKey) {
+    const hasLeft = departed.has(e.authorAddress);
+    // A departed member may re-join with a FRESH purse key — their new
+    // MEMBER_JOIN re-attests it, so the binding check below (not the old
+    // registration) is what authorises them. Every other entry, from every
+    // other author, must carry the purse key registered at join.
+    const rejoining = e.entryType === 'MEMBER_JOIN' && hasLeft;
+    if (!rejoining && registeredPk !== undefined && registeredPk !== e.pursePublicKey) {
       skip(s, 'purse key does not match the one registered at join');
       continue;
     }
-    const isMember = registeredPk !== undefined;
+    const isMember = registeredPk !== undefined && !hasLeft;
+    // A member who has left keeps their history and their unsettled edges, but
+    // cannot author new ledger activity until they re-join.
+    if (
+      hasLeft &&
+      e.entryType !== 'MEMBER_JOIN' &&
+      e.entryType !== 'LEDGER_OPEN'
+    ) {
+      skip(s, 'author has left the ledger');
+      continue;
+    }
     switch (e.entryType) {
       case 'LEDGER_OPEN': {
         if (genesisHash !== null) {
@@ -469,7 +500,21 @@ export function replayState(entries: LogEntry[]): LedgerState {
           skip(s, 'binding attestation does not verify — purse is not bound to authorAddress');
           break;
         }
+        // A re-join is a NEW membership, never a silent reactivation of the old
+        // one: it registers whatever purse key this fresh attestation names.
         members.set(e.authorAddress, e.pursePublicKey);
+        departed.delete(e.authorAddress);
+        break;
+      }
+      case 'MEMBER_LEAVE': {
+        if (!isMember) {
+          skip(s, 'author is not an active member');
+          break;
+        }
+        // Leaving with a non-zero position is allowed and deliberate: the
+        // unsettled edge stays visible and stays in netting until it settles.
+        // The record follows the address (PRD 6).
+        departed.add(e.authorAddress);
         break;
       }
       case 'OBLIGATION_PROPOSE': {
@@ -613,7 +658,7 @@ export function replayState(entries: LogEntry[]): LedgerState {
     ledgerName,
     genesisHash,
     members: [...members.entries()]
-      .map(([address, pursePublicKey]) => ({ address, pursePublicKey }))
+      .map(([address, pursePublicKey]) => ({ address, pursePublicKey, active: !departed.has(address) }))
       .sort((a, b) => (a.address < b.address ? -1 : 1)),
     obligations: sortedObligations,
     acceptedPending: sortedObligations

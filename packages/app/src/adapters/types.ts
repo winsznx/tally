@@ -75,6 +75,12 @@ export interface ProviderAdapter {
   readonly language: string | undefined;
   /** The wallet's network id, known only AFTER the first returned tx. */
   readonly detectedNetworkId: number | undefined;
+  /**
+   * The wallet's addresses. Opens a dialog. A Nimiq Pay account can hold
+   * several, so the app must decide WHICH one is the user (GAP A) and detect
+   * later switches (GAP B) rather than assuming index 0.
+   */
+  listAccounts(): Promise<ProviderResult<string[]>>;
   sign(message: string): Promise<ProviderResult<SignatureResult>>;
   sendBasicTransaction(params: BasicTxParams): Promise<ProviderResult<WalletTx>>;
   sendBasicTransactionWithData(params: BasicTxWithDataParams): Promise<ProviderResult<WalletTx>>;

@@ -87,6 +87,19 @@ export class NimiqPayProvider implements ProviderAdapter {
     return this.#provider;
   }
 
+  async listAccounts(): Promise<ProviderResult<string[]>> {
+    try {
+      const res = await this.#require().listAccounts();
+      if (isErrorResponse(res)) {
+        const m = JSON.stringify(res.error);
+        return looksDeclined(m) ? DECLINED : providerError(m);
+      }
+      return ok(res);
+    } catch (e) {
+      return this.#fromThrow(e);
+    }
+  }
+
   async sign(message: string): Promise<ProviderResult<SignatureResult>> {
     try {
       const res = await this.#require().sign(message);

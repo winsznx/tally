@@ -7,11 +7,18 @@ failure costs the purse feature, not the product.
 
 **Setup**
 1. `cd /Users/mac/tally && npm run dev -- --host`. Note the Network URL
-   (`http://<lan-ip>:5173`).
-2. In Nimiq Pay, enable the hidden dev menu: 10-second long-press on the settings
-   button. Switch to **testnet**.
+   (`http://<lan-ip>:5173`). Once the shell is deployed, prefer the **HTTPS Pages
+   URL** instead — it is a secure context, so `crypto.randomUUID` is available
+   and the whole insecure-context question disappears from this run.
+2. In Nimiq Pay, switch to **testnet** (hidden dev menu: 10-second long-press on
+   the settings button).
 3. Empty-state home → **Get free NIM** (110,000 testnet NIM per tap). Tap 3–4×.
-4. Mini Apps → **Custom URL** → paste the Network URL. The harness loads.
+4. Open **Discover** and type the URL into the **“Search or enter App URL”**
+   field. The app loads, and then persists under **Recently Viewed** — so the URL
+   is entered once per device, not every time.
+
+   > This is also the **demo path**: loading Tally through Discover on camera
+   > shows it running natively inside the wallet rather than in a browser.
 
 **Test E — environment (auto-runs, no button)**
 5. Read the `env` card. Record: `innerHeight`/`innerWidth`,

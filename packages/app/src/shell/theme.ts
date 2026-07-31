@@ -22,9 +22,32 @@ export class LocalThemeStore implements ThemeStore {
   }
 }
 
-/** The effective theme: persisted choice if any, else the system preference. */
+/**
+ * Nimiq Pay is LIGHT-ONLY, so Tally defaults to light regardless of the device's
+ * prefers-color-scheme. Established from converging official sources:
+ *   - every official Pay screenshot is light (App Store, Google Play, and the
+ *     nimiq/nimpay-website repo — whose own site is meticulously dual-themed via
+ *     CSS light-dark(), so its maintainers would have shipped a dark pair if one
+ *     existed; there is exactly one variant of each, and it is light);
+ *   - 25 versions of Pay release notes mention no theme/dark/appearance at all;
+ *   - the official mini-app docs and Nimiq's own mini-apps skill contain zero
+ *     theming guidance.
+ *
+ * The decisive point for us: `NimiqPayHostContext` exposes `language` and
+ * `userFiat` but NO theme signal. So `prefers-color-scheme` would key off the
+ * DEVICE OS, not the host — a user with system dark mode would get a dark mini
+ * app inside light Nimiq Pay chrome, the worst possible outcome for the scored
+ * "feels native on a phone" criterion.
+ *
+ * The explicit toggle still overrides this and persists.
+ */
+export const HOST_IS_LIGHT_ONLY = true;
+
+/** The effective theme: the persisted choice if any, else the host default. */
 export function resolveTheme(store: ThemeStore, prefersDark: boolean): Theme {
-  return store.get() ?? (prefersDark ? 'dark' : 'light');
+  const chosen = store.get();
+  if (chosen) return chosen;
+  return HOST_IS_LIGHT_ONLY ? 'light' : prefersDark ? 'dark' : 'light';
 }
 
 export function applyTheme(root: { classList: { add(c: string): void; remove(c: string): void } }, theme: Theme): void {

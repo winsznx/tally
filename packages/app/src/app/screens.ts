@@ -16,6 +16,8 @@ export type Degraded =
   | { kind: 'consensusLost' }
   | { kind: 'forked'; divergenceHint: string }
   | { kind: 'underfunded'; shortBy: bigint }
+  /** GAP B: the wallet no longer offers the address this tab was joined with. */
+  | { kind: 'accountSwitched'; joinedWith: string }
   | null;
 
 export function nim(luna: bigint): string {
@@ -87,6 +89,15 @@ export function renderDegraded(d: Degraded, t: Translator): string {
         'This ledger has diverged',
         `${t.t('degraded.forked')} ${d.divergenceHint}`,
       );
+    case 'accountSwitched':
+      // Never render an empty or broken ledger — name the address the tab was
+      // joined with and give both ways forward.
+      return `
+    <div class="banner warn" role="status">
+      <div class="banner-t">This tab belongs to a different address</div>
+      <div class="banner-b">You joined it with <span class="mono">${esc(shortAddr(d.joinedWith))}</span>, which your wallet is not currently offering. Switch back to that address in Nimiq Pay and the tab returns exactly as it was — nothing has been lost.</div>
+      <button class="banner-a" data-action="join-fresh">Join as a new member instead</button>
+    </div>`;
     case 'underfunded':
       return banner(
         'warn',
@@ -266,4 +277,26 @@ export function renderHome(
         <button class="btn" data-action="add">${t.t('obligation.add')}</button>
       </div>
     </div>`;
+}
+
+/**
+ * GAP D — the invite link is a capability. Anyone holding the URL can read the
+ * whole tab from the relay; there is no access control beyond knowing the
+ * 128-bit id. That is the right trade for a 2-to-12 person tab (an approval step
+ * would wreck the 60-second onboarding target for a threat model that does not
+ * warrant it), but it must be DISCLOSED at the moment of sharing rather than
+ * discovered later.
+ */
+export const INVITE_DISCLOSURE =
+  'Anyone with this link can see this tab — its members, expenses and settlements. Share it only with the people in it.';
+
+export function renderShareSheet(inviteUrl: string, deeplinkUrl: string, isMobile: boolean): string {
+  const primary = isMobile ? deeplinkUrl : inviteUrl;
+  return `
+    <section class="card">
+      <div class="collapse-h"><strong>Invite to this tab</strong></div>
+      <div class="mono" style="word-break:break-all">${esc(primary)}</div>
+      <p class="note">${esc(INVITE_DISCLOSURE)}</p>
+      <button class="btn" data-action="share" data-url="${esc(primary)}">Share link</button>
+    </section>`;
 }

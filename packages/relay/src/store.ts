@@ -99,6 +99,10 @@ export class D1Store implements Store {
       )
       .bind(ipHash, windowStart)
       .first<{ count: number }>();
+    // Occasionally drop expired windows so the table cannot grow without bound.
+    if (Math.random() < 0.01) {
+      await this.db.prepare('DELETE FROM rate_limit WHERE windowStart < ?').bind(windowStart - 600_000).run();
+    }
     return (row?.count ?? 1) <= limit;
   }
 }

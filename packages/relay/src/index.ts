@@ -46,12 +46,18 @@ export default {
     const store = new D1Store(env.DB);
     const now = Date.now();
 
-    // Per-ip rate limit (ip hashed — no PII stored).
-    const ip = request.headers.get('cf-connecting-ip') ?? 'unknown';
-    const ipHash = await sha256Hex(ip);
-    const windowStart = Math.floor(now / RATE_WINDOW_MS) * RATE_WINDOW_MS;
-    if (!(await store.hitRateLimit(ipHash, windowStart, RATE_LIMIT))) {
-      return json(429, { error: 'rate limited' });
+    // Per-ip rate limit (ip hashed — no PII stored). It FAILS OPEN: if the
+    // rate-limit table is unavailable, serve the request rather than taking the
+    // relay down over a spam control. Degrade to usable, never to a blank page.
+    try {
+      const ip = request.headers.get('cf-connecting-ip') ?? 'unknown';
+      const ipHash = await sha256Hex(ip);
+      const windowStart = Math.floor(now / RATE_WINDOW_MS) * RATE_WINDOW_MS;
+      if (!(await store.hitRateLimit(ipHash, windowStart, RATE_LIMIT))) {
+        return json(429, { error: 'rate limited' });
+      }
+    } catch {
+      // fail open
     }
 
     try {

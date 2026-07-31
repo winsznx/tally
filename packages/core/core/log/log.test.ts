@@ -557,3 +557,90 @@ describe('obligationLogRoot', () => {
     expect(() => obligationLogRoot(['xyz'])).toThrow(LogError);
   });
 });
+
+describe('MEMBER_LEAVE (GAP C)', () => {
+  it('a member with a zero position can leave and stops being active', () => {
+    const { log } = basicLedger();
+    log.append(makeEntry(carol, 'MEMBER_JOIN', {}, log.headHash, 3));
+    log.append(makeEntry(carol, 'MEMBER_LEAVE', {}, log.headHash, 4));
+    const state = log.replay();
+    const c = state.members.find((m) => m.address === addr(carol));
+    expect(c?.active).toBe(false);
+    // still listed — the record follows the address
+    expect(state.members.map((m) => m.address)).toContain(addr(carol));
+  });
+
+  it('leaving with a debt keeps the edge visible and still in netting', () => {
+    const { log, proposeId } = basicLedger(); // bob owes alice 500
+    log.append(makeEntry(bob, 'OBLIGATION_ACCEPT', { proposeId }, log.headHash, 3));
+    log.append(makeEntry(bob, 'MEMBER_LEAVE', { reason: 'moved out' }, log.headHash, 4));
+
+    const state = log.replay();
+    expect(state.members.find((m) => m.address === addr(bob))?.active).toBe(false);
+    // the accepted debt survives departure and stays in the netting input
+    expect(state.acceptedPending).toEqual([
+      { proposeId, debtor: addr(bob), creditor: addr(alice), amount: 500n },
+    ]);
+
+    // and it can still settle: a round opens over it normally
+    log.append(makeEntry(alice, 'ROUND_OPEN', { round: 1, anchorHeight: ACCEPT_HEIGHT, mode: 'minimal' }, log.headHash, 5));
+    expect(log.replay().openRound?.round).toBe(1);
+  });
+
+  it('a departed member cannot create new obligations', () => {
+    const { log } = basicLedger();
+    log.append(makeEntry(bob, 'MEMBER_LEAVE', {}, log.headHash, 3));
+    log.append(
+      makeEntry(bob, 'OBLIGATION_PROPOSE', { debtor: addr(alice), creditor: addr(bob), amount: '900' }, log.headHash, 4),
+    );
+    const state = log.replay();
+    expect(state.obligations.map((o) => o.amount)).toEqual([500n]); // the new one was skipped
+    expect(state.ignored.some((i) => i.reason.includes('has left'))).toBe(true);
+  });
+
+  it('rejoining is a NEW membership, not a silent reactivation — a fresh purse is re-attested', () => {
+    const { log } = basicLedger();
+    log.append(makeEntry(bob, 'MEMBER_LEAVE', {}, log.headHash, 3));
+    expect(log.replay().members.find((m) => m.address === addr(bob))?.active).toBe(false);
+
+    // bob returns with a DIFFERENT purse key, attested afresh by the same account
+    const bobNewPurse: Member = { account: bob.account, purse: mk('b1', 'b9').purse };
+    log.append(makeEntry(bobNewPurse, 'MEMBER_JOIN', {}, log.headHash, 4));
+
+    const state = log.replay();
+    const b = state.members.find((m) => m.address === addr(bob));
+    expect(b?.active).toBe(true);
+    expect(b?.pursePublicKey).toBe(pursePk(bobNewPurse)); // the new purse, not the old
+    expect(b?.pursePublicKey).not.toBe(pursePk(bob));
+  });
+
+  it('rejects a MEMBER_LEAVE forged with the wrong purse key', () => {
+    const { log } = basicLedger();
+    const forged = signEntry(
+      {
+        prevEntryHash: log.headHash,
+        entryType: 'MEMBER_LEAVE',
+        payload: {},
+        authorAddress: addr(bob),
+        pursePublicKey: pursePk(mallory),
+        nonce: nextNonce(),
+        logicalClock: 3,
+      },
+      mallory.purse,
+    );
+    log.append(forged);
+    const state = log.replay();
+    expect(state.members.find((m) => m.address === addr(bob))?.active).toBe(true); // still a member
+    expect(state.ignored.some((i) => i.entryType === 'MEMBER_LEAVE' && i.reason.includes('purse key'))).toBe(true);
+  });
+
+  it('departing while a round is open does not cancel the round', () => {
+    const { log, proposeId } = basicLedger();
+    log.append(makeEntry(bob, 'OBLIGATION_ACCEPT', { proposeId }, log.headHash, 3));
+    log.append(makeEntry(alice, 'ROUND_OPEN', { round: 1, anchorHeight: ACCEPT_HEIGHT, mode: 'minimal' }, log.headHash, 4));
+    log.append(makeEntry(bob, 'MEMBER_LEAVE', {}, log.headHash, 5));
+    const state = log.replay();
+    expect(state.openRound?.round).toBe(1);
+    expect(state.obligations[0]?.status).toBe('IN_ROUND');
+  });
+});

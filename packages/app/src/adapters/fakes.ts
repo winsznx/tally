@@ -31,6 +31,12 @@ export class FakeProvider implements ProviderAdapter {
   async init(): Promise<{ insideNimiqPay: boolean; language: string | undefined }> {
     return { insideNimiqPay: this.insideNimiqPay, language: this.language };
   }
+  accounts: string[] = ['NQ00 FAKE'];
+  async listAccounts(): Promise<ProviderResult<string[]>> {
+    if (this.nextOutcome === 'declined') return DECLINED;
+    if (this.nextOutcome === 'error') return providerError('fake error');
+    return ok(this.accounts);
+  }
   async sign(message: string): Promise<ProviderResult<SignatureResult>> {
     if (this.nextOutcome === 'declined') return DECLINED;
     if (this.nextOutcome === 'error') return providerError('fake error');
