@@ -67,7 +67,7 @@ export class LogError extends Error {
 
 // --- canonical JSON ---------------------------------------------------------
 
-function canonicalJson(value: unknown): string {
+export function canonicalJson(value: unknown): string {
   if (value === null) return 'null';
   switch (typeof value) {
     case 'string':
@@ -104,19 +104,27 @@ export function entryId(entry: Pick<LogEntry, 'authorAddress' | 'nonce' | 'entry
   return bytesToHex(Hash.computeBlake2b(preimage));
 }
 
+/**
+ * The exact canonical text an entry's Ed25519 signature covers. Exported so the
+ * relay can reconstruct and verify signatures without depending on @nimiq/core
+ * (it re-derives this string and checks the signature with Web Crypto). A
+ * cross-check test guarantees the relay's copy stays byte-identical to this.
+ */
+export function entrySigningText(entry: Omit<LogEntry, 'purseSignature'>): string {
+  return [
+    'tally-log-entry-v1',
+    `prev:${entry.prevEntryHash ?? '-'}`,
+    `type:${entry.entryType}`,
+    `author:${entry.authorAddress}`,
+    `pursePk:${entry.pursePublicKey}`,
+    `nonce:${entry.nonce}`,
+    `clock:${entry.logicalClock}`,
+    `payload:${canonicalJson(entry.payload)}`,
+  ].join('\n');
+}
+
 function signingBytes(entry: Omit<LogEntry, 'purseSignature'>): Uint8Array {
-  return utf8(
-    [
-      'tally-log-entry-v1',
-      `prev:${entry.prevEntryHash ?? '-'}`,
-      `type:${entry.entryType}`,
-      `author:${entry.authorAddress}`,
-      `pursePk:${entry.pursePublicKey}`,
-      `nonce:${entry.nonce}`,
-      `clock:${entry.logicalClock}`,
-      `payload:${canonicalJson(entry.payload)}`,
-    ].join('\n'),
-  );
+  return utf8(entrySigningText(entry));
 }
 
 export function entryHash(entry: LogEntry): string {
