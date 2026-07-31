@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+<link href="https://fonts.googleapis.com/css2?family=Mulish:wght@400;600;700;800;900;1000&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0D0A08;font-family:Mulish,system-ui,sans-serif;font-variant-numeric:tabular-nums}
+a{color:#F5F0E8}a:hover{color:#E8940C}
+::selection{background:rgba(232,148,12,.3)}
+.dv-turn{padding:44px 48px 36px;border-bottom:1px solid rgba(237,228,214,.07);scroll-margin-top:16px}
+.dv-thd{display:flex;align-items:baseline;gap:10px;margin:0 0 12px}
+.dv-tid{font:800 10px ui-monospace,Menlo,monospace;padding:3px 7px;background:#F5F0E8;color:#14100E;border-radius:4px;text-decoration:none}
+.dv-tname{font:800 13px Mulish,sans-serif;color:#F5F0E8}
+.dv-note{font:400 12.5px/1.7 Mulish,sans-serif;color:rgba(237,228,214,.55);max-width:860px;margin:0 0 22px}
+.dv-opts{display:flex;flex-wrap:wrap;gap:40px;align-items:flex-start}
+.dv-opt{flex:none;display:flex;flex-direction:column;gap:11px;scroll-margin-top:16px}
+.dv-oid{font:800 10.5px ui-monospace,Menlo,monospace;padding:3px 7px;background:rgba(237,228,214,.12);color:#F5F0E8;border-radius:5px;text-decoration:none}
+.dv-olabel{display:flex;align-items:baseline;gap:8px;font:600 11.5px Mulish,sans-serif;color:rgba(237,228,214,.55)}
+.dv-opt:target .dv-oid{background:#E8940C;color:#14100E}
+.dv-next{margin:28px 0 0;font:12.5px/1.5 Mulish,sans-serif;color:rgba(237,228,214,.45)}
+.sw{display:inline-block;width:11px;height:11px;border-radius:50%;vertical-align:-1px;border:1px solid rgba(237,228,214,.2);margin:0 5px 0 12px}
+.ph{width:390px;height:780px;border-radius:22px;overflow:hidden;border:1px solid rgba(237,228,214,.14);box-shadow:0 30px 60px rgba(0,0,0,.45)}
+.ph.lt{border-color:#E3DED7;box-shadow:0 30px 60px rgba(28,21,18,.14)}
+.tka{--pg:#14100E;--card:#1C1512;--cardHov:#261E18;--tx:#F5F0E8;--sec:#A79E94;--mut:#8A8279;--hl:#2A221D;--btn:#F5F0E8;--btnTx:#1A140F;--btnHov:#FFFBF2;--ambT:#E8940C;--ambF:#E8940C;--ghostA:tlyGhost 8.6s linear infinite}
+.tkl{--pg:#FFFFFF;--card:#F7F5F2;--cardHov:#EFEBE4;--tx:#1C1512;--sec:#55504C;--mut:#756D63;--hl:#E3DED7;--btn:#1C1512;--btnTx:#FFFFFF;--btnHov:#3A2F28;--ambT:#A05E00;--ambF:#E8940C;--ghostA:tlyGhostL 8.6s linear infinite}
+@keyframes tlyCyc{0%,8%{opacity:.55}13%,22%{opacity:1}30%,96%{opacity:0}100%{opacity:.55}}
+@keyframes tlyCycW{0%,8%{stroke-width:1.6}13%,22%{stroke-width:2.6}30%,100%{stroke-width:1.6}}
+@keyframes tlyFin{0%,8%{opacity:.55}13%,22%{opacity:.3}30%{opacity:.6}38%{opacity:.75}46%,96%{opacity:1}100%{opacity:.55}}
+@keyframes tlyFinW{0%,40%{stroke-width:1.6}46%,96%{stroke-width:2.6}100%{stroke-width:1.6}}
+@keyframes tlyGhost{0%,32%{opacity:1}40%,96%{opacity:.22}100%{opacity:1}}
+@keyframes tlyChip{0%,34%{opacity:0;transform:translateY(5px)}42%,96%{opacity:1;transform:translateY(0)}100%{opacity:0;transform:translateY(5px)}}
+@keyframes tlyGhostL{0%,32%{opacity:1}40%,96%{opacity:.35}100%{opacity:1}}
+</style>
+</helmet>
+<!-- Art direction per user brief: dark warm ink, Mulish, tabular figures, amber reserved for the settled state. Organic DS intentionally set aside (user-confirmed). Frames are bare WebView surfaces, 390x780 — host chrome belongs to Nimiq Pay. -->
+
+<section class="dv-turn" id="t3">
+<div class="dv-thd"><a class="dv-tid" href="#t3">3</a><span class="dv-tname">Light mode — inherited default, one-tap override</span></div>
+<div class="dv-note">The app now runs on theme tokens; every screen renders in both modes. Default is inherited, never asked: the app reads prefers-color-scheme — the OS theme is the closest proxy for how Nimiq Pay renders, since the framework exposes only window.nimiqPay.language. The sun/moon button beside the purse chip overrides it, instantly (≤150 ms) and persistently. Only colour changes: identical type, spacing and layout; positions stay words and +/− signs; elevation stays hairline + surface step, no shadows. Amber splits into two tokens — fill #E8940C in both modes (ink text on it), text #E8940C on dark and #A05E00 on light (darkened one step from #A66200, which misses 4.5:1 on #F7F5F2). The light drop-out keeps a higher opacity floor (35%) with the "nets to zero" chip carrying the meaning. Submission screenshots and the thumbnail stay dark. Pairs below are the five break-prone screens: <a class="dv-oid" href="#3a">3a</a> home · <a class="dv-oid" href="#3b">3b</a> collapse · <a class="dv-oid" href="#3c">3c</a> settling · <a class="dv-oid" href="#3d">3d</a> purse step 1 · <a class="dv-oid" href="#3e">3e</a> declined.</div>
+<div class="dv-opts">
+
+<div class="dv-opt" id="3a">
+<div class="dv-olabel"><a class="dv-oid" href="#3a">3a</a>Ledger home — the position number on both canvases</div>
+<div style="display:flex;gap:24px"><div class="ph">
+<div class="tka" data-screen-label="02 Ledger home · dark" style="width:100%;height:100%;background:var(--pg);color:var(--tx);font-family:Mulish,system-ui,sans-serif;display:flex;flex-direction:column;padding:24px 20px 0;box-sizing:border-box"><div style="display:flex;align-items:center;justify-content:space-between"><div style="display:flex;align-items:center;gap:8px"><svg width="15" height="15" viewBox="0 0 18 18" fill="none"><rect x="4.2" y="0.5" width="4.2" height="17" rx="1.4" style="fill:var(--tx)"></rect><rect x="9.6" y="0.5" width="4.2" height="17" rx="1.4" style="fill:var(--tx)"></rect><rect x="4.2" y="5" width="8.2" height="1.9" style="fill:var(--pg)"></rect><rect x="5.8" y="8.8" width="8" height="1.9" style="fill:var(--pg)"></rect><rect x="4.2" y="12.8" width="9.6" height="1.9" style="fill:var(--ambF)"></rect></svg><span style="font-size:15px;font-weight:800">Porto, June</span></div><div style="display:flex;align-items:center;gap:8px"><div style="display:flex;align-items:center;gap:6px;border:1px solid var(--hl);border-radius:999px;padding:0 12px;height:30px;font-size:12px;font-weight:700;color:var(--sec)">Purse<span style="color:var(--tx);font-weight:800">2,000</span></div><div role="button" style="width:30px;height:30px;border:1px solid var(--hl);border-radius:999px;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="border-color:var(--sec)"><svg width="15" height="15" viewBox="0 0 15 15" fill="none"><circle cx="7.5" cy="7.5" r="3" style="stroke:var(--sec)" stroke-width="1.6"></circle><path d="M7.5 0.8v2M7.5 12.2v2M0.8 7.5h2M12.2 7.5h2M2.9 2.9l1.4 1.4M10.7 10.7l1.4 1.4M12.1 2.9l-1.4 1.4M4.3 10.7l-1.4 1.4" style="stroke:var(--sec)" stroke-width="1.4" stroke-linecap="round"></path></svg></div></div></div><div style="height:30px"></div><div style="text-align:center"><div style="font-size:10.5px;font-weight:800;letter-spacing:0.14em;color:var(--mut);text-transform:uppercase">Your position</div><div style="margin-top:12px;font-size:66px;font-weight:900;letter-spacing:-0.02em;line-height:1"><span style="color:var(--mut);font-weight:700">+</span>1,500<span style="font-size:17px;font-weight:700;color:var(--mut);margin-left:9px">NIM</span></div><div style="margin-top:13px;font-size:15px;color:var(--sec);font-weight:600">You're owed 1,500 NIM</div><div style="margin-top:20px;display:flex;justify-content:center"><div role="button" style="height:44px;border:1px solid var(--hl);border-radius:999px;padding:0 20px;display:flex;align-items:center;gap:8px;font-size:13px;font-weight:800;cursor:pointer" style-hover="border-color:var(--sec)">Preview settlement<span style="color:var(--mut)">→</span></div></div></div><div style="height:26px"></div><div style="font-size:10.5px;font-weight:800;letter-spacing:0.14em;color:var(--mut);text-transform:uppercase">People</div><div style="display:flex;align-items:center;gap:12px;height:56px;border-bottom:1px solid var(--hl)"><div style="width:34px;height:34px;border-radius:50%;background:var(--card);border:1px solid var(--hl);display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:800;color:var(--sec)">A</div><div style="flex:1;min-width:0"><div style="font-size:15px;font-weight:800">Ada</div><div style="font-size:11.5px;color:var(--mut);font-weight:600">owes the tab</div></div><div><span style="font-size:17px;font-weight:800">−1,200</span><span style="font-size:11px;font-weight:700;color:var(--mut);margin-left:4px">NIM</span></div></div><div style="display:flex;align-items:center;gap:12px;height:56px;border-bottom:1px solid var(--hl)"><div style="width:34px;height:34px;border-radius:50%;background:var(--card);border:1px solid var(--hl);display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:800;color:var(--sec)">B</div><div style="flex:1;min-width:0"><div style="font-size:15px;font-weight:800">Bo</div><div style="font-size:11.5px;color:var(--mut);font-weight:600">owes the tab</div></div><div><span style="font-size:17px;font-weight:800">−300</span><span style="font-size:11px;font-weight:700;color:var(--mut);margin-left:4px">NIM</span></div></div><div style="display:flex;align-items:center;gap:12px;height:56px;border-bottom:1px solid var(--hl)"><div style="width:34px;height:34px;border-radius:50%;background:var(--card);border:1px solid var(--hl);display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:800;color:var(--sec)">C</div><div style="flex:1;min-width:0"><div style="font-size:15px;font-weight:800">Cy</div><div style="font-size:11.5px;color:var(--mut);font-weight:600">even — drops out of the round</div></div><div><span style="font-size:17px;font-weight:800;color:var(--mut)">0</span><span style="font-size:11px;font-weight:700;color:var(--mut);margin-left:4px">NIM</span></div></div><div style="height:18px"></div><div style="font-size:10.5px;font-weight:800;letter-spacing:0.14em;color:var(--mut);text-transform:uppercase">Activity</div><div style="display:flex;align-items:center;gap:10px;height:49px;border-bottom:1px solid var(--hl)"><div style="flex:1;font-size:13.5px;color:var(--sec);font-weight:600;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Cy accepted <span style="color:var(--tx);font-weight:800">Wine night</span></div><span style="font-size:14px;font-weight:800">500</span><span style="font-size:11.5px;color:var(--mut);font-weight:600">2h</span></div><div style="display:flex;align-items:center;gap:10px;height:49px;border-bottom:1px solid var(--hl)"><div style="flex:1;font-size:13.5px;color:var(--sec);font-weight:600;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Bo accepted <span style="color:var(--tx);font-weight:800">Fuel</span></div><span style="font-size:14px;font-weight:800">300</span><span style="font-size:11.5px;color:var(--mut);font-weight:600">4h</span></div><div style="display:flex;align-items:center;gap:10px;height:49px"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7.5L5.5 11L12 3.5" style="stroke:var(--ambT)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg><div style="flex:1;font-size:13.5px;font-weight:600;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><span style="color:var(--ambT);font-weight:800">Round 6 settled</span><span style="color:var(--mut)"> — 3 transfers · anchored</span></div><span style="font-size:11.5px;color:var(--mut);font-weight:600">Tue</span></div><div style="margin-top:auto;padding:12px 0 20px"><div role="button" style="height:56px;border-radius:16px;background:var(--btn);color:var(--btnTx);font-size:16px;font-weight:800;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:var(--btnHov)">Add expense</div></div></div>
+</div><div class="ph lt">
+<div class="tkl" data-screen-label="02 Ledger home · light" style="width:100%;height:100%;background:var(--pg);color:var(--tx);font-family:Mulish,system-ui,sans-serif;display:flex;flex-direction:column;padding:24px 20px 0;box-sizing:border-box"><div style="display:flex;align-items:center;justify-content:space-between"><div style="display:flex;align-items:center;gap:8px"><svg width="15" height="15" viewBox="0 0 18 18" fill="none"><rect x="4.2" y="0.5" width="4.2" height="17" rx="1.4" style="fill:var(--tx)"></rect><rect x="9.6" y="0.5" width="4.2" height="17" rx="1.4" style="fill:var(--tx)"></rect><rect x="4.2" y="5" width="8.2" height="1.9" style="fill:var(--pg)"></rect><rect x="5.8" y="8.8" width="8" height="1.9" style="fill:var(--pg)"></rect><rect x="4.2" y="12.8" width="9.6" height="1.9" style="fill:var(--ambF)"></rect></svg><span style="font-size:15px;font-weight:800">Porto, June</span></div><div style="display:flex;align-items:center;gap:8px"><div style="display:flex;align-items:center;gap:6px;border:1px solid var(--hl);border-radius:999px;padding:0 12px;height:30px;font-size:12px;font-weight:700;color:var(--sec)">Purse<span style="color:var(--tx);font-weight:800">2,000</span></div><div role="button" style="width:30px;height:30px;border:1px solid var(--hl);border-radius:999px;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="border-color:var(--sec)"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M12.4 8.7A5.7 5.7 0 1 1 5.3 1.6a4.6 4.6 0 0 0 7.1 7.1z" fill="none" style="stroke:var(--sec)" stroke-width="1.5" stroke-linejoin="round"></path></svg></div></div></div><div style="height:30px"></div><div style="text-align:center"><div style="font-size:10.5px;font-weight:800;letter-spacing:0.14em;color:var(--mut);text-transform:uppercase">Your position</div><div style="margin-top:12px;font-size:66px;font-weight:900;letter-spacing:-0.02em;line-height:1"><span style="color:var(--mut);font-weight:700">+</span>1,500<span style="font-size:17px;font-weight:700;color:var(--mut);margin-left:9px">NIM</span></div><div style="margin-top:13px;font-size:15px;color:var(--sec);font-weight:600">You're owed 1,500 NIM</div><div style="margin-top:20px;display:flex;justify-content:center"><div role="button" style="height:44px;border:1px solid var(--hl);border-radius:999px;padding:0 20px;display:flex;align-items:center;gap:8px;font-size:13px;font-weight:800;cursor:pointer" style-hover="border-color:var(--sec)">Preview settlement<span style="color:var(--mut)">→</span></div></div></div><div style="height:26px"></div><div style="font-size:10.5px;font-weight:800;letter-spacing:0.14em;color:var(--mut);text-transform:uppercase">People</div><div style="display:flex;align-items:center;gap:12px;height:56px;border-bottom:1px solid var(--hl)"><div style="width:34px;height:34px;border-radius:50%;background:var(--card);border:1px solid var(--hl);display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:800;color:var(--sec)">A</div><div style="flex:1;min-width:0"><div style="font-size:15px;font-weight:800">Ada</div><div style="font-size:11.5px;color:var(--mut);font-weight:600">owes the tab</div></div><div><span style="font-size:17px;font-weight:800">−1,200</span><span style="font-size:11px;font-weight:700;color:var(--mut);margin-left:4px">NIM</span></div></div><div style="display:flex;align-items:center;gap:12px;height:56px;border-bottom:1px solid var(--hl)"><div style="width:34px;height:34px;border-radius:50%;background:var(--card);border:1px solid var(--hl);display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:800;color:var(--sec)">B</div><div style="flex:1;min-width:0"><div style="font-size:15px;font-weight:800">Bo</div><div style="font-size:11.5px;color:var(--mut);font-weight:600">owes the tab</div></div><div><span style="font-size:17px;font-weight:800">−300</span><span style="font-size:11px;font-weight:700;color:var(--mut);margin-left:4px">NIM</span></div></div><div style="display:flex;align-items:center;gap:12px;height:56px;border-bottom:1px solid var(--hl)"><div style="width:34px;height:34px;border-radius:50%;background:var(--card);border:1px solid var(--hl);display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:800;color:var(--sec)">C</div><div style="flex:1;min-width:0"><div style="font-size:15px;font-weight:800">Cy</div><div style="font-size:11.5px;color:var(--mut);font-weight:600">even — drops out of the round</div></div><div><span style="font-size:17px;font-weight:800;color:var(--mut)">0</span><span style="font-size:11px;font-weight:700;color:var(--mut);margin-left:4px">NIM</span></div></div><div style="height:18px"></div><div style="font-size:10.5px;font-weight:800;letter-spacing:0.14em;color:var(--mut);text-transform:uppercase">Activity</div><div style="display:flex;align-items:center;gap:10px;height:49px;border-bottom:1px solid var(--hl)"><div style="flex:1;font-size:13.5px;color:var(--sec);font-weight:600;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Cy accepted <span style="color:var(--tx);font-weight:800">Wine night</span></div><span style="font-size:14px;font-weight:800">500</span><span style="font-size:11.5px;color:var(--mut);font-weight:600">2h</span></div><div style="display:flex;align-items:center;gap:10px;height:49px;border-bottom:1px solid var(--hl)"><div style="flex:1;font-size:13.5px;color:var(--sec);font-weight:600;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Bo accepted <span style="color:var(--tx);font-weight:800">Fuel</span></div><span style="font-size:14px;font-weight:800">300</span><span style="font-size:11.5px;color:var(--mut);font-weight:600">4h</span></div><div style="display:flex;align-items:center;gap:10px;height:49px"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7.5L5.5 11L12 3.5" style="stroke:var(--ambT)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg><div style="flex:1;font-size:13.5px;font-weight:600;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><span style="color:var(--ambT);font-weight:800">Round 6 settled</span><span style="color:var(--mut)"> — 3 transfers · anchored</span></div><span style="font-size:11.5px;color:var(--mut);font-weight:600">Tue</span></div><div style="margin-top:auto;padding:12px 0 20px"><div role="button" style="height:56px;border-radius:16px;background:var(--btn);color:var(--btnTx);font-size:16px;font-weight:800;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:var(--btnHov)">Add expense</div></div></div>
+</div></div>
+</div>
+
+<div class="dv-opt" id="3b">
+<div class="dv-olabel"><a class="dv-oid" href="#3b">3b</a>Settlement preview — collapse rebalanced for white</div>
+<div style="display:flex;gap:24px"><div class="ph">
+<div class="tka" data-screen-label="05 Settlement preview · dark" style="width:100%;height:100%;background:var(--pg);color:var(--tx);font-family:Mulish,system-ui,sans-serif;display:flex;flex-direction:column;padding:24px 20px 0;box-sizing:border-box"><div style="display:flex;align-items:center;gap:6px"><div role="button" style="width:38px;height:44px;display:flex;align-items:center;cursor:pointer"><svg width="10" height="18" viewBox="0 0 10 18" fill="none"><path d="M9 1L1 9l8 8" style="stroke:var(--sec)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg></div><div style="flex:1"><div style="font-size:16px;font-weight:800">Settle up</div><div style="font-size:11.5px;color:var(--mut);font-weight:700">Round 7 · preview</div></div><div style="display:flex;align-items:center;gap:8px"><div style="display:flex;align-items:center;gap:6px;border:1px solid var(--hl);border-radius:999px;padding:0 12px;height:30px;font-size:12px;font-weight:700;color:var(--sec)">Purse<span style="color:var(--tx);font-weight:800">2,000</span></div><div role="button" style="width:30px;height:30px;border:1px solid var(--hl);border-radius:999px;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="border-color:var(--sec)"><svg width="15" height="15" viewBox="0 0 15 15" fill="none"><circle cx="7.5" cy="7.5" r="3" style="stroke:var(--sec)" stroke-width="1.6"></circle><path d="M7.5 0.8v2M7.5 12.2v2M0.8 7.5h2M12.2 7.5h2M2.9 2.9l1.4 1.4M10.7 10.7l1.4 1.4M12.1 2.9l-1.4 1.4M4.3 10.7l-1.4 1.4" style="stroke:var(--sec)" stroke-width="1.4" stroke-linecap="round"></path></svg></div></div></div><div style="height:14px"></div><div style="font-size:10.5px;font-weight:800;letter-spacing:0.14em;color:var(--mut);text-transform:uppercase">Five debts, two transfers</div><div style="height:244px;margin-top:4px"><svg viewBox="0 0 350 262" width="100%" height="100%" style="display:block"><defs><marker id="tArrD" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="context-stroke"></path></marker></defs><g style="opacity:0.55;animation:tlyCyc 8.6s linear infinite"><path d="M 92 54 Q 175 36 258 54" fill="none" stroke-width="1.6" stroke-linecap="round" marker-end="url(#tArrD)" style="stroke:var(--tx);animation:tlyCycW 8.6s linear infinite"></path><text x="175" y="30" text-anchor="middle" font-size="11.5" font-weight="800" stroke-width="4" style="fill:var(--tx);stroke:var(--pg);paint-order:stroke">500</text></g><g style="opacity:0.55;animation:tlyCyc 8.6s linear infinite"><path d="M 288 92 Q 303 129 288 166" fill="none" stroke-width="1.6" stroke-linecap="round" marker-end="url(#tArrD)" style="stroke:var(--tx);animation:tlyCycW 8.6s linear infinite"></path><text x="322" y="133" text-anchor="middle" font-size="11.5" font-weight="800" stroke-width="4" style="fill:var(--tx);stroke:var(--pg);paint-order:stroke">500</text></g><g style="opacity:0.55;animation:tlyCyc 8.6s linear infinite"><path d="M 258 182 Q 175 129 92 76" fill="none" stroke-width="1.6" stroke-linecap="round" marker-end="url(#tArrD)" style="stroke:var(--tx);animation:tlyCycW 8.6s linear infinite"></path><text x="229" y="170" text-anchor="middle" font-size="11.5" font-weight="800" stroke-width="4" style="fill:var(--tx);stroke:var(--pg);paint-order:stroke">500</text></g><g style="opacity:0.55;animation:tlyFin 8.6s linear infinite"><path d="M 62 92 Q 46 129 62 166" fill="none" stroke-width="1.6" stroke-linecap="round" marker-end="url(#tArrD)" style="stroke:var(--tx);animation:tlyFinW 8.6s linear infinite"></path><text x="32" y="133" text-anchor="middle" font-size="11.5" font-weight="800" stroke-width="4" style="fill:var(--tx);stroke:var(--pg);paint-order:stroke">1,200</text></g><g style="opacity:0.55;animation:tlyFin 8.6s linear infinite"><path d="M 256 78 Q 175 129 94 180" fill="none" stroke-width="1.6" stroke-linecap="round" marker-end="url(#tArrD)" style="stroke:var(--tx);animation:tlyFinW 8.6s linear infinite"></path><text x="118" y="162" text-anchor="middle" font-size="11.5" font-weight="800" stroke-width="4" style="fill:var(--tx);stroke:var(--pg);paint-order:stroke">300</text></g><g><circle cx="66" cy="62" r="24" stroke-width="1" style="fill:var(--card);stroke:var(--hl)"></circle><text x="66" y="66" text-anchor="middle" font-size="11.5" font-weight="800" style="fill:var(--tx)">Ada</text></g><g><circle cx="284" cy="62" r="24" stroke-width="1" style="fill:var(--card);stroke:var(--hl)"></circle><text x="284" y="66" text-anchor="middle" font-size="11.5" font-weight="800" style="fill:var(--tx)">Bo</text></g><g style="animation:var(--ghostA)"><circle cx="284" cy="196" r="24" stroke-width="1" style="fill:var(--card);stroke:var(--hl)"></circle><text x="284" y="200" text-anchor="middle" font-size="11.5" font-weight="800" style="fill:var(--tx)">Cy</text></g><g><circle cx="66" cy="196" r="24" stroke-width="1" style="fill:var(--card);stroke:var(--hl)"></circle><text x="66" y="200" text-anchor="middle" font-size="11.5" font-weight="800" style="fill:var(--tx)">Dee</text><text x="66" y="238" text-anchor="middle" font-size="9" font-weight="800" letter-spacing="1.5" style="fill:var(--mut)">YOU</text></g><g style="opacity:0;animation:tlyChip 8.6s linear infinite"><rect x="236" y="228" width="96" height="21" rx="10.5" fill="none" style="stroke:var(--hl)"></rect><text x="284" y="242" text-anchor="middle" font-size="9" font-weight="800" letter-spacing="0.8" style="fill:var(--sec)">NETS TO ZERO</text></g></svg></div><div style="margin-top:6px;text-align:center;font-size:13px;font-weight:600;color:var(--sec);opacity:0;animation:tlyChip 8.6s linear infinite">Cy nets to zero — sits this round out</div><div style="margin-top:8px;text-align:center;font-size:13px;font-weight:700;color:var(--mut)">5 obligations → <span style="color:var(--tx);font-weight:900">2 transfers</span> · 1,500 NIM moves</div><div style="height:18px"></div><div style="font-size:10.5px;font-weight:800;letter-spacing:0.14em;color:var(--mut);text-transform:uppercase">Transfers</div><div style="display:flex;align-items:center;gap:12px;height:56px;border-bottom:1px solid var(--hl)"><div style="flex:1;min-width:0"><div style="font-size:15px;font-weight:800">Ada <span style="color:var(--mut);font-weight:700">→</span> Dee</div><div style="font-size:11.5px;color:var(--mut);font-weight:600">sends when Ada opens Tally</div></div><div><span style="font-size:18px;font-weight:900">1,200</span><span style="font-size:11px;font-weight:700;color:var(--mut);margin-left:4px">NIM</span></div></div><div style="display:flex;align-items:center;gap:12px;height:56px"><div style="flex:1;min-width:0"><div style="font-size:15px;font-weight:800">Bo <span style="color:var(--mut);font-weight:700">→</span> Dee</div><div style="font-size:11.5px;color:var(--mut);font-weight:600">sends when Bo opens Tally</div></div><div><span style="font-size:18px;font-weight:900">300</span><span style="font-size:11px;font-weight:700;color:var(--mut);margin-left:4px">NIM</span></div></div><div style="margin-top:auto;padding:12px 0 20px;display:flex;flex-direction:column;gap:10px"><div role="button" style="height:56px;border-radius:16px;background:var(--btn);color:var(--btnTx);font-size:16px;font-weight:800;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:var(--btnHov)">Call the tab</div><div style="font-size:11.5px;color:var(--mut);text-align:center;font-weight:600">Each leg sends itself — settled at finality, about a minute</div></div></div>
+</div><div class="ph lt">
+<div class="tkl" data-screen-label="05 Settlement preview · light" style="width:100%;height:100%;background:var(--pg);color:var(--tx);font-family:Mulish,system-ui,sans-serif;display:flex;flex-direction:column;padding:24px 20px 0;box-sizing:border-box"><div style="display:flex;align-items:center;gap:6px"><div role="button" style="width:38px;height:44px;display:flex;align-items:center;cursor:pointer"><svg width="10" height="18" viewBox="0 0 10 18" fill="none"><path d="M9 1L1 9l8 8" style="stroke:var(--sec)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg></div><div style="flex:1"><div style="font-size:16px;font-weight:800">Settle up</div><div style="font-size:11.5px;color:var(--mut);font-weight:700">Round 7 · preview</div></div><div style="display:flex;align-items:center;gap:8px"><div style="display:flex;align-items:center;gap:6px;border:1px solid var(--hl);border-radius:999px;padding:0 12px;height:30px;font-size:12px;font-weight:700;color:var(--sec)">Purse<span style="color:var(--tx);font-weight:800">2,000</span></div><div role="button" style="width:30px;height:30px;border:1px solid var(--hl);border-radius:999px;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="border-color:var(--sec)"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M12.4 8.7A5.7 5.7 0 1 1 5.3 1.6a4.6 4.6 0 0 0 7.1 7.1z" fill="none" style="stroke:var(--sec)" stroke-width="1.5" stroke-linejoin="round"></path></svg></div></div></div><div style="height:14px"></div><div style="font-size:10.5px;font-weight:800;letter-spacing:0.14em;color:var(--mut);text-transform:uppercase">Five debts, two transfers</div><div style="height:244px;margin-top:4px"><svg viewBox="0 0 350 262" width="100%" height="100%" style="display:block"><defs><marker id="tArrL" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="context-stroke"></path></marker></defs><g style="opacity:0.55;animation:tlyCyc 8.6s linear infinite"><path d="M 92 54 Q 175 36 258 54" fill="none" stroke-width="1.6" stroke-linecap="round" marker-end="url(#tArrL)" style="stroke:var(--tx);animation:tlyCycW 8.6s linear infinite"></path><text x="175" y="30" text-anchor="middle" font-size="11.5" font-weight="800" stroke-width="4" style="fill:var(--tx);stroke:var(--pg);paint-order:stroke">500</text></g><g style="opacity:0.55;animation:tlyCyc 8.6s linear infinite"><path d="M 288 92 Q 303 129 288 166" fill="none" stroke-width="1.6" stroke-linecap="round" marker-end="url(#tArrL)" style="stroke:var(--tx);animation:tlyCycW 8.6s linear infinite"></path><text x="322" y="133" text-anchor="middle" font-size="11.5" font-weight="800" stroke-width="4" style="fill:var(--tx);stroke:var(--pg);paint-order:stroke">500</text></g><g style="opacity:0.55;animation:tlyCyc 8.6s linear infinite"><path d="M 258 182 Q 175 129 92 76" fill="none" stroke-width="1.6" stroke-linecap="round" marker-end="url(#tArrL)" style="stroke:var(--tx);animation:tlyCycW 8.6s linear infinite"></path><text x="229" y="170" text-anchor="middle" font-size="11.5" font-weight="800" stroke-width="4" style="fill:var(--tx);stroke:var(--pg);paint-order:stroke">500</text></g><g style="opacity:0.55;animation:tlyFin 8.6s linear infinite"><path d="M 62 92 Q 46 129 62 166" fill="none" stroke-width="1.6" stroke-linecap="round" marker-end="url(#tArrL)" style="stroke:var(--tx);animation:tlyFinW 8.6s linear infinite"></path><text x="32" y="133" text-anchor="middle" font-size="11.5" font-weight="800" stroke-width="4" style="fill:var(--tx);stroke:var(--pg);paint-order:stroke">1,200</text></g><g style="opacity:0.55;animation:tlyFin 8.6s linear infinite"><path d="M 256 78 Q 175 129 94 180" fill="none" stroke-width="1.6" stroke-linecap="round" marker-end="url(#tArrL)" style="stroke:var(--tx);animation:tlyFinW 8.6s linear infinite"></path><text x="118" y="162" text-anchor="middle" font-size="11.5" font-weight="800" stroke-width="4" style="fill:var(--tx);stroke:var(--pg);paint-order:stroke">300</text></g><g><circle cx="66" cy="62" r="24" stroke-width="1" style="fill:var(--card);stroke:var(--hl)"></circle><text x="66" y="66" text-anchor="middle" font-size="11.5" font-weight="800" style="fill:var(--tx)">Ada</text></g><g><circle cx="284" cy="62" r="24" stroke-width="1" style="fill:var(--card);stroke:var(--hl)"></circle><text x="284" y="66" text-anchor="middle" font-size="11.5" font-weight="800" style="fill:var(--tx)">Bo</text></g><g style="animation:var(--ghostA)"><circle cx="284" cy="196" r="24" stroke-width="1" style="fill:var(--card);stroke:var(--hl)"></circle><text x="284" y="200" text-anchor="middle" font-size="11.5" font-weight="800" style="fill:var(--tx)">Cy</text></g><g><circle cx="66" cy="196" r="24" stroke-width="1" style="fill:var(--card);stroke:var(--hl)"></circle><text x="66" y="200" text-anchor="middle" font-size="11.5" font-weight="800" style="fill:var(--tx)">Dee</text><text x="66" y="238" text-anchor="middle" font-size="9" font-weight="800" letter-spacing="1.5" style="fill:var(--mut)">YOU</text></g><g style="opacity:0;animation:tlyChip 8.6s linear infinite"><rect x="236" y="228" width="96" height="21" rx="10.5" fill="none" style="stroke:var(--hl)"></rect><text x="284" y="242" text-anchor="middle" font-size="9" font-weight="800" letter-spacing="0.8" style="fill:var(--sec)">NETS TO ZERO</text></g></svg></div><div style="margin-top:6px;text-align:center;font-size:13px;font-weight:600;color:var(--sec);opacity:0;animation:tlyChip 8.6s linear infinite">Cy nets to zero — sits this round out</div><div style="margin-top:8px;text-align:center;font-size:13px;font-weight:700;color:var(--mut)">5 obligations → <span style="color:var(--tx);font-weight:900">2 transfers</span> · 1,500 NIM moves</div><div style="height:18px"></div><div style="font-size:10.5px;font-weight:800;letter-spacing:0.14em;color:var(--mut);text-transform:uppercase">Transfers</div><div style="display:flex;align-items:center;gap:12px;height:56px;border-bottom:1px solid var(--hl)"><div style="flex:1;min-width:0"><div style="font-size:15px;font-weight:800">Ada <span style="color:var(--mut);font-weight:700">→</span> Dee</div><div style="font-size:11.5px;color:var(--mut);font-weight:600">sends when Ada opens Tally</div></div><div><span style="font-size:18px;font-weight:900">1,200</span><span style="font-size:11px;font-weight:700;color:var(--mut);margin-left:4px">NIM</span></div></div><div style="display:flex;align-items:center;gap:12px;height:56px"><div style="flex:1;min-width:0"><div style="font-size:15px;font-weight:800">Bo <span style="color:var(--mut);font-weight:700">→</span> Dee</div><div style="font-size:11.5px;color:var(--mut);font-weight:600">sends when Bo opens Tally</div></div><div><span style="font-size:18px;font-weight:900">300</span><span style="font-size:11px;font-weight:700;color:var(--mut);margin-left:4px">NIM</span></div></div><div style="margin-top:auto;padding:12px 0 20px;display:flex;flex-direction:column;gap:10px"><div role="button" style="height:56px;border-radius:16px;background:var(--btn);color:var(--btnTx);font-size:16px;font-weight:800;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:var(--btnHov)">Call the tab</div><div style="font-size:11.5px;color:var(--mut);text-align:center;font-weight:600">Each leg sends itself — settled at finality, about a minute</div></div></div>
+</div></div>
+</div>
+
+<div class="dv-opt" id="3c">
+<div class="dv-olabel"><a class="dv-oid" href="#3c">3c</a>Settling — countdown and the amber settled row</div>
+<div style="display:flex;gap:24px"><div class="ph">
+<div class="tka" data-screen-label="06 Settling · dark" style="width:100%;height:100%;background:var(--pg);color:var(--tx);font-family:Mulish,system-ui,sans-serif;display:flex;flex-direction:column;padding:24px 20px 0;box-sizing:border-box"><div style="display:flex;align-items:center;gap:6px"><div role="button" style="width:38px;height:44px;display:flex;align-items:center;cursor:pointer"><svg width="10" height="18" viewBox="0 0 10 18" fill="none"><path d="M9 1L1 9l8 8" style="stroke:var(--sec)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg></div><div style="flex:1"><div style="font-size:16px;font-weight:800">Settling</div><div style="font-size:11.5px;color:var(--mut);font-weight:700">Round 7 · 1 of 2 landed</div></div><div style="display:flex;align-items:center;gap:8px"><div style="display:flex;align-items:center;gap:6px;border:1px solid var(--hl);border-radius:999px;padding:0 12px;height:30px;font-size:12px;font-weight:700;color:var(--sec)">Purse<span style="color:var(--tx);font-weight:800">2,000</span></div><div role="button" style="width:30px;height:30px;border:1px solid var(--hl);border-radius:999px;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="border-color:var(--sec)"><svg width="15" height="15" viewBox="0 0 15 15" fill="none"><circle cx="7.5" cy="7.5" r="3" style="stroke:var(--sec)" stroke-width="1.6"></circle><path d="M7.5 0.8v2M7.5 12.2v2M0.8 7.5h2M12.2 7.5h2M2.9 2.9l1.4 1.4M10.7 10.7l1.4 1.4M12.1 2.9l-1.4 1.4M4.3 10.7l-1.4 1.4" style="stroke:var(--sec)" stroke-width="1.4" stroke-linecap="round"></path></svg></div></div></div><div style="height:30px"></div><div style="text-align:center"><div style="font-size:10.5px;font-weight:800;letter-spacing:0.14em;color:var(--mut);text-transform:uppercase">Finality in</div><div style="margin-top:8px;font-size:64px;font-weight:900;letter-spacing:-0.02em;line-height:1">41<span style="font-size:16px;font-weight:700;color:var(--mut);margin-left:8px">blocks</span></div><div style="margin-top:10px;font-size:12.5px;color:var(--sec);font-weight:600">macro block #41,220 · about 41 seconds</div><div style="margin:16px auto 0;width:240px;height:4px;border-radius:2px;background:var(--hl)"><div style="width:66%;height:100%;border-radius:2px;background:var(--tx)"></div></div></div><div style="height:30px"></div><div style="font-size:10.5px;font-weight:800;letter-spacing:0.14em;color:var(--mut);text-transform:uppercase">Transfers</div><div style="display:flex;align-items:center;gap:12px;height:62px;border-bottom:1px solid var(--hl)"><div style="flex:1;min-width:0"><div style="font-size:15px;font-weight:800">Ada <span style="color:var(--mut);font-weight:700">→</span> Dee</div><div style="margin-top:2px;font-size:11.5px;font-weight:700"><span style="color:var(--ambT);font-weight:800">Settled</span><span style="color:var(--mut)"> · anchored at #41,140</span></div></div><span style="font-size:17px;font-weight:900">1,200</span><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7.5L5.5 11L12 3.5" style="stroke:var(--ambT)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg></div><div style="display:flex;align-items:center;gap:12px;height:62px;border-bottom:1px solid var(--hl)"><div style="flex:1;min-width:0"><div style="font-size:15px;font-weight:800">Bo <span style="color:var(--mut);font-weight:700">→</span> Dee</div><div style="margin-top:2px;font-size:11.5px;color:var(--mut);font-weight:700">Confirming — lands at the macro block</div></div><span style="font-size:17px;font-weight:900">300</span><svg width="15" height="15" viewBox="0 0 15 15" fill="none"><circle cx="7.5" cy="7.5" r="6" style="stroke:var(--sec)" stroke-width="1.8" stroke-dasharray="3 3.4"></circle></svg></div><div style="display:flex;align-items:center;gap:12px;height:52px"><div style="flex:1;font-size:12.5px;color:var(--mut);font-weight:600">Cy nets to zero — nothing to send</div><span style="font-size:15px;font-weight:800;color:var(--mut)">0</span></div><div style="margin-top:auto;padding:12px 0 20px;display:flex;flex-direction:column;gap:10px"><div style="font-size:13px;color:var(--sec);text-align:center;font-weight:600">You receive <span style="color:var(--tx);font-weight:800">1,500 NIM</span> when the round closes — nothing for you to do.</div><div role="button" style="height:48px;border:1px solid var(--hl);border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:14.5px;font-weight:800;cursor:pointer" style-hover="border-color:var(--sec)">Back to the tab</div></div></div>
+</div><div class="ph lt">
+<div class="tkl" data-screen-label="06 Settling · light" style="width:100%;height:100%;background:var(--pg);color:var(--tx);font-family:Mulish,system-ui,sans-serif;display:flex;flex-direction:column;padding:24px 20px 0;box-sizing:border-box"><div style="display:flex;align-items:center;gap:6px"><div role="button" style="width:38px;height:44px;display:flex;align-items:center;cursor:pointer"><svg width="10" height="18" viewBox="0 0 10 18" fill="none"><path d="M9 1L1 9l8 8" style="stroke:var(--sec)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg></div><div style="flex:1"><div style="font-size:16px;font-weight:800">Settling</div><div style="font-size:11.5px;color:var(--mut);font-weight:700">Round 7 · 1 of 2 landed</div></div><div style="display:flex;align-items:center;gap:8px"><div style="display:flex;align-items:center;gap:6px;border:1px solid var(--hl);border-radius:999px;padding:0 12px;height:30px;font-size:12px;font-weight:700;color:var(--sec)">Purse<span style="color:var(--tx);font-weight:800">2,000</span></div><div role="button" style="width:30px;height:30px;border:1px solid var(--hl);border-radius:999px;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="border-color:var(--sec)"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M12.4 8.7A5.7 5.7 0 1 1 5.3 1.6a4.6 4.6 0 0 0 7.1 7.1z" fill="none" style="stroke:var(--sec)" stroke-width="1.5" stroke-linejoin="round"></path></svg></div></div></div><div style="height:30px"></div><div style="text-align:center"><div style="font-size:10.5px;font-weight:800;letter-spacing:0.14em;color:var(--mut);text-transform:uppercase">Finality in</div><div style="margin-top:8px;font-size:64px;font-weight:900;letter-spacing:-0.02em;line-height:1">41<span style="font-size:16px;font-weight:700;color:var(--mut);margin-left:8px">blocks</span></div><div style="margin-top:10px;font-size:12.5px;color:var(--sec);font-weight:600">macro block #41,220 · about 41 seconds</div><div style="margin:16px auto 0;width:240px;height:4px;border-radius:2px;background:var(--hl)"><div style="width:66%;height:100%;border-radius:2px;background:var(--tx)"></div></div></div><div style="height:30px"></div><div style="font-size:10.5px;font-weight:800;letter-spacing:0.14em;color:var(--mut);text-transform:uppercase">Transfers</div><div style="display:flex;align-items:center;gap:12px;height:62px;border-bottom:1px solid var(--hl)"><div style="flex:1;min-width:0"><div style="font-size:15px;font-weight:800">Ada <span style="color:var(--mut);font-weight:700">→</span> Dee</div><div style="margin-top:2px;font-size:11.5px;font-weight:700"><span style="color:var(--ambT);font-weight:800">Settled</span><span style="color:var(--mut)"> · anchored at #41,140</span></div></div><span style="font-size:17px;font-weight:900">1,200</span><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7.5L5.5 11L12 3.5" style="stroke:var(--ambT)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg></div><div style="display:flex;align-items:center;gap:12px;height:62px;border-bottom:1px solid var(--hl)"><div style="flex:1;min-width:0"><div style="font-size:15px;font-weight:800">Bo <span style="color:var(--mut);font-weight:700">→</span> Dee</div><div style="margin-top:2px;font-size:11.5px;color:var(--mut);font-weight:700">Confirming — lands at the macro block</div></div><span style="font-size:17px;font-weight:900">300</span><svg width="15" height="15" viewBox="0 0 15 15" fill="none"><circle cx="7.5" cy="7.5" r="6" style="stroke:var(--sec)" stroke-width="1.8" stroke-dasharray="3 3.4"></circle></svg></div><div style="display:flex;align-items:center;gap:12px;height:52px"><div style="flex:1;font-size:12.5px;color:var(--mut);font-weight:600">Cy nets to zero — nothing to send</div><span style="font-size:15px;font-weight:800;color:var(--mut)">0</span></div><div style="margin-top:auto;padding:12px 0 20px;display:flex;flex-direction:column;gap:10px"><div style="font-size:13px;color:var(--sec);text-align:center;font-weight:600">You receive <span style="color:var(--tx);font-weight:800">1,500 NIM</span> when the round closes — nothing for you to do.</div><div role="button" style="height:48px;border:1px solid var(--hl);border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:14.5px;font-weight:800;cursor:pointer" style-hover="border-color:var(--sec)">Back to the tab</div></div></div>
+</div></div>
+</div>
+
+<div class="dv-opt" id="3d">
+<div class="dv-olabel"><a class="dv-oid" href="#3d">3d</a>Purse setup step 1 — candid, calm in both modes</div>
+<div style="display:flex;gap:24px"><div class="ph">
+<div class="tka" data-screen-label="07a Purse binding · dark" style="width:100%;height:100%;background:var(--pg);color:var(--tx);font-family:Mulish,system-ui,sans-serif;display:flex;flex-direction:column;padding:24px 20px 0;box-sizing:border-box"><div style="display:flex;align-items:center;gap:6px"><div role="button" style="width:38px;height:44px;display:flex;align-items:center;cursor:pointer"><svg width="10" height="18" viewBox="0 0 10 18" fill="none"><path d="M9 1L1 9l8 8" style="stroke:var(--sec)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg></div><div style="flex:1"><div style="font-size:16px;font-weight:800">Set up your purse</div><div style="font-size:11.5px;color:var(--mut);font-weight:700">Optional — skippable forever</div></div><div role="button" style="width:30px;height:30px;border:1px solid var(--hl);border-radius:999px;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="border-color:var(--sec)"><svg width="15" height="15" viewBox="0 0 15 15" fill="none"><circle cx="7.5" cy="7.5" r="3" style="stroke:var(--sec)" stroke-width="1.6"></circle><path d="M7.5 0.8v2M7.5 12.2v2M0.8 7.5h2M12.2 7.5h2M2.9 2.9l1.4 1.4M10.7 10.7l1.4 1.4M12.1 2.9l-1.4 1.4M4.3 10.7l-1.4 1.4" style="stroke:var(--sec)" stroke-width="1.4" stroke-linecap="round"></path></svg></div></div><div style="height:20px"></div><div style="display:flex;align-items:center;gap:10px"><div style="display:flex;gap:5px"><div style="width:22px;height:4px;border-radius:2px;background:var(--tx)"></div><div style="width:22px;height:4px;border-radius:2px;background:var(--hl)"></div></div><span style="font-size:11.5px;color:var(--mut);font-weight:700">Step 1 of 2 — one signature</span></div><div style="height:16px"></div><div style="font-size:23px;font-weight:900;line-height:1.25">Sign once, settle without dialogs</div><div style="margin-top:10px;font-size:13.5px;color:var(--sec);font-weight:600;line-height:1.6">One signature derives a small spending key — the purse. It pays your settlements while Tally is open. Your Nimiq Pay key is used exactly twice: this signature, and the top-up that follows.</div><div style="height:22px"></div><div style="font-size:10.5px;font-weight:800;letter-spacing:0.14em;color:var(--mut);text-transform:uppercase">Plain truths</div><div style="padding:11px 0 10px;border-bottom:1px solid var(--hl)"><div style="font-size:14px;font-weight:800">A cash drawer, not a vault</div><div style="margin-top:3px;font-size:12px;color:var(--sec);font-weight:600;line-height:1.5">It lives in this app, on this device. Keep pocket money in it, not savings.</div></div><div style="padding:11px 0 10px;border-bottom:1px solid var(--hl)"><div style="font-size:14px;font-weight:800">The balance is the entire risk</div><div style="margin-top:3px;font-size:12px;color:var(--sec);font-weight:600;line-height:1.5">Whatever the purse holds is all that can ever be lost. Nothing outside it can be touched.</div></div><div style="padding:11px 0 10px;border-bottom:1px solid var(--hl)"><div style="font-size:14px;font-weight:800">Withdraw everything, one tap</div><div style="margin-top:3px;font-size:12px;color:var(--sec);font-weight:600;line-height:1.5">From any screen, any time. Same account re-creates the purse on any device — nothing to write down.</div></div><div style="padding:11px 0 10px"><div style="font-size:14px;font-weight:800">Skipping costs one tap per payment</div><div style="margin-top:3px;font-size:12px;color:var(--sec);font-weight:600;line-height:1.5">No purse means Nimiq Pay asks before each settlement. Everything else works the same.</div></div><div style="margin-top:auto;padding:12px 0 20px;display:flex;flex-direction:column;gap:9px"><div style="font-size:12px;color:var(--sec);text-align:center;font-weight:600">Nimiq Pay will ask you to sign one message. Signing is free and moves nothing.</div><div role="button" style="height:56px;border-radius:16px;background:var(--btn);color:var(--btnTx);font-size:16px;font-weight:800;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:var(--btnHov)">Sign the binding</div><div role="button" style="height:44px;display:flex;align-items:center;justify-content:center;font-size:13.5px;font-weight:800;color:var(--sec);cursor:pointer" style-hover="color:var(--tx)">Skip — settle manually</div></div></div>
+</div><div class="ph lt">
+<div class="tkl" data-screen-label="07a Purse binding · light" style="width:100%;height:100%;background:var(--pg);color:var(--tx);font-family:Mulish,system-ui,sans-serif;display:flex;flex-direction:column;padding:24px 20px 0;box-sizing:border-box"><div style="display:flex;align-items:center;gap:6px"><div role="button" style="width:38px;height:44px;display:flex;align-items:center;cursor:pointer"><svg width="10" height="18" viewBox="0 0 10 18" fill="none"><path d="M9 1L1 9l8 8" style="stroke:var(--sec)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg></div><div style="flex:1"><div style="font-size:16px;font-weight:800">Set up your purse</div><div style="font-size:11.5px;color:var(--mut);font-weight:700">Optional — skippable forever</div></div><div role="button" style="width:30px;height:30px;border:1px solid var(--hl);border-radius:999px;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="border-color:var(--sec)"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M12.4 8.7A5.7 5.7 0 1 1 5.3 1.6a4.6 4.6 0 0 0 7.1 7.1z" fill="none" style="stroke:var(--sec)" stroke-width="1.5" stroke-linejoin="round"></path></svg></div></div><div style="height:20px"></div><div style="display:flex;align-items:center;gap:10px"><div style="display:flex;gap:5px"><div style="width:22px;height:4px;border-radius:2px;background:var(--tx)"></div><div style="width:22px;height:4px;border-radius:2px;background:var(--hl)"></div></div><span style="font-size:11.5px;color:var(--mut);font-weight:700">Step 1 of 2 — one signature</span></div><div style="height:16px"></div><div style="font-size:23px;font-weight:900;line-height:1.25">Sign once, settle without dialogs</div><div style="margin-top:10px;font-size:13.5px;color:var(--sec);font-weight:600;line-height:1.6">One signature derives a small spending key — the purse. It pays your settlements while Tally is open. Your Nimiq Pay key is used exactly twice: this signature, and the top-up that follows.</div><div style="height:22px"></div><div style="font-size:10.5px;font-weight:800;letter-spacing:0.14em;color:var(--mut);text-transform:uppercase">Plain truths</div><div style="padding:11px 0 10px;border-bottom:1px solid var(--hl)"><div style="font-size:14px;font-weight:800">A cash drawer, not a vault</div><div style="margin-top:3px;font-size:12px;color:var(--sec);font-weight:600;line-height:1.5">It lives in this app, on this device. Keep pocket money in it, not savings.</div></div><div style="padding:11px 0 10px;border-bottom:1px solid var(--hl)"><div style="font-size:14px;font-weight:800">The balance is the entire risk</div><div style="margin-top:3px;font-size:12px;color:var(--sec);font-weight:600;line-height:1.5">Whatever the purse holds is all that can ever be lost. Nothing outside it can be touched.</div></div><div style="padding:11px 0 10px;border-bottom:1px solid var(--hl)"><div style="font-size:14px;font-weight:800">Withdraw everything, one tap</div><div style="margin-top:3px;font-size:12px;color:var(--sec);font-weight:600;line-height:1.5">From any screen, any time. Same account re-creates the purse on any device — nothing to write down.</div></div><div style="padding:11px 0 10px"><div style="font-size:14px;font-weight:800">Skipping costs one tap per payment</div><div style="margin-top:3px;font-size:12px;color:var(--sec);font-weight:600;line-height:1.5">No purse means Nimiq Pay asks before each settlement. Everything else works the same.</div></div><div style="margin-top:auto;padding:12px 0 20px;display:flex;flex-direction:column;gap:9px"><div style="font-size:12px;color:var(--sec);text-align:center;font-weight:600">Nimiq Pay will ask you to sign one message. Signing is free and moves nothing.</div><div role="button" style="height:56px;border-radius:16px;background:var(--btn);color:var(--btnTx);font-size:16px;font-weight:800;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:var(--btnHov)">Sign the binding</div><div role="button" style="height:44px;display:flex;align-items:center;justify-content:center;font-size:13.5px;font-weight:800;color:var(--sec);cursor:pointer" style-hover="color:var(--tx)">Skip — settle manually</div></div></div>
+</div></div>
+</div>
+
+<div class="dv-opt" id="3e">
+<div class="dv-olabel"><a class="dv-oid" href="#3e">3e</a>Dialog declined — a normal outcome in both modes</div>
+<div style="display:flex;gap:24px"><div class="ph">
+<div class="tka" data-screen-label="13a Dialog declined · dark" style="width:100%;height:100%;background:var(--pg);color:var(--tx);font-family:Mulish,system-ui,sans-serif;display:flex;flex-direction:column;padding:24px 20px 0;box-sizing:border-box"><div style="display:flex;align-items:center;gap:6px"><div role="button" style="width:38px;height:44px;display:flex;align-items:center;cursor:pointer"><svg width="10" height="18" viewBox="0 0 10 18" fill="none"><path d="M9 1L1 9l8 8" style="stroke:var(--sec)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg></div><div style="flex:1;font-size:16px;font-weight:800">Purse setup</div><div role="button" style="width:30px;height:30px;border:1px solid var(--hl);border-radius:999px;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="border-color:var(--sec)"><svg width="15" height="15" viewBox="0 0 15 15" fill="none"><circle cx="7.5" cy="7.5" r="3" style="stroke:var(--sec)" stroke-width="1.6"></circle><path d="M7.5 0.8v2M7.5 12.2v2M0.8 7.5h2M12.2 7.5h2M2.9 2.9l1.4 1.4M10.7 10.7l1.4 1.4M12.1 2.9l-1.4 1.4M4.3 10.7l-1.4 1.4" style="stroke:var(--sec)" stroke-width="1.4" stroke-linecap="round"></path></svg></div></div><div style="height:44px"></div><div style="font-size:23px;font-weight:900;line-height:1.25">You said not now</div><div style="margin-top:10px;font-size:13.5px;color:var(--sec);font-weight:600;line-height:1.6">Nothing was signed and nothing moved. You're in manual mode — a complete Tally that asks once per payment.</div><div style="height:26px"></div><div style="font-size:10.5px;font-weight:800;letter-spacing:0.14em;color:var(--mut);text-transform:uppercase">You can still</div><div style="display:flex;align-items:center;gap:12px;height:58px;border-bottom:1px solid var(--hl)"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7.5L5.5 11L12 3.5" style="stroke:var(--tx)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" opacity="0.85"></path></svg><div style="flex:1"><div style="font-size:14px;font-weight:800">Track, accept and dispute</div><div style="font-size:11.5px;color:var(--mut);font-weight:600">the full ledger, zero dialogs</div></div></div><div style="display:flex;align-items:center;gap:12px;height:58px;border-bottom:1px solid var(--hl)"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7.5L5.5 11L12 3.5" style="stroke:var(--tx)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" opacity="0.85"></path></svg><div style="flex:1"><div style="font-size:14px;font-weight:800">Settle manually</div><div style="font-size:11.5px;color:var(--mut);font-weight:600">one approval per payment</div></div></div><div style="display:flex;align-items:center;gap:12px;height:58px"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7.5L5.5 11L12 3.5" style="stroke:var(--tx)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" opacity="0.85"></path></svg><div style="flex:1"><div style="font-size:14px;font-weight:800">Add the purse later</div><div style="font-size:11.5px;color:var(--mut);font-weight:600">Settings → Purse · same two steps</div></div></div><div style="margin-top:auto;padding:12px 0 20px;display:flex;flex-direction:column;gap:9px"><div role="button" style="height:56px;border-radius:16px;background:var(--btn);color:var(--btnTx);font-size:16px;font-weight:800;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:var(--btnHov)">Keep going</div><div role="button" style="height:44px;display:flex;align-items:center;justify-content:center;font-size:13.5px;font-weight:800;color:var(--sec);cursor:pointer" style-hover="color:var(--tx)">Try the signature again</div></div></div>
+</div><div class="ph lt">
+<div class="tkl" data-screen-label="13a Dialog declined · light" style="width:100%;height:100%;background:var(--pg);color:var(--tx);font-family:Mulish,system-ui,sans-serif;display:flex;flex-direction:column;padding:24px 20px 0;box-sizing:border-box"><div style="display:flex;align-items:center;gap:6px"><div role="button" style="width:38px;height:44px;display:flex;align-items:center;cursor:pointer"><svg width="10" height="18" viewBox="0 0 10 18" fill="none"><path d="M9 1L1 9l8 8" style="stroke:var(--sec)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg></div><div style="flex:1;font-size:16px;font-weight:800">Purse setup</div><div role="button" style="width:30px;height:30px;border:1px solid var(--hl);border-radius:999px;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="border-color:var(--sec)"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M12.4 8.7A5.7 5.7 0 1 1 5.3 1.6a4.6 4.6 0 0 0 7.1 7.1z" fill="none" style="stroke:var(--sec)" stroke-width="1.5" stroke-linejoin="round"></path></svg></div></div><div style="height:44px"></div><div style="font-size:23px;font-weight:900;line-height:1.25">You said not now</div><div style="margin-top:10px;font-size:13.5px;color:var(--sec);font-weight:600;line-height:1.6">Nothing was signed and nothing moved. You're in manual mode — a complete Tally that asks once per payment.</div><div style="height:26px"></div><div style="font-size:10.5px;font-weight:800;letter-spacing:0.14em;color:var(--mut);text-transform:uppercase">You can still</div><div style="display:flex;align-items:center;gap:12px;height:58px;border-bottom:1px solid var(--hl)"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7.5L5.5 11L12 3.5" style="stroke:var(--tx)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" opacity="0.85"></path></svg><div style="flex:1"><div style="font-size:14px;font-weight:800">Track, accept and dispute</div><div style="font-size:11.5px;color:var(--mut);font-weight:600">the full ledger, zero dialogs</div></div></div><div style="display:flex;align-items:center;gap:12px;height:58px;border-bottom:1px solid var(--hl)"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7.5L5.5 11L12 3.5" style="stroke:var(--tx)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" opacity="0.85"></path></svg><div style="flex:1"><div style="font-size:14px;font-weight:800">Settle manually</div><div style="font-size:11.5px;color:var(--mut);font-weight:600">one approval per payment</div></div></div><div style="display:flex;align-items:center;gap:12px;height:58px"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7.5L5.5 11L12 3.5" style="stroke:var(--tx)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" opacity="0.85"></path></svg><div style="flex:1"><div style="font-size:14px;font-weight:800">Add the purse later</div><div style="font-size:11.5px;color:var(--mut);font-weight:600">Settings → Purse · same two steps</div></div></div><div style="margin-top:auto;padding:12px 0 20px;display:flex;flex-direction:column;gap:9px"><div role="button" style="height:56px;border-radius:16px;background:var(--btn);color:var(--btnTx);font-size:16px;font-weight:800;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:var(--btnHov)">Keep going</div><div role="button" style="height:44px;display:flex;align-items:center;justify-content:center;font-size:13.5px;font-weight:800;color:var(--sec);cursor:pointer" style-hover="color:var(--tx)">Try the signature again</div></div></div>
+</div></div>
+</div>
+
+</div>
+<p class="dv-next">Try next: "flip any other screen to light" · "roll the toggle into every header" · "export the icon, GIF thumbnail and the five dark screenshots"</p>
+</section>
+
+<section class="dv-turn" id="t2">
+<div class="dv-thd"><a class="dv-tid" href="#t2">2</a><span class="dv-tname">Purse setup · settling · degraded states · screens 3, 4, 9–12</span></div>
+<div class="dv-note">Corrections applied to turn 1 below: device chrome removed — every frame is the bare WebView surface at 390×780 (usable height under the host header; primary actions sit above the bottom gesture zone), and the cold open is now a three-person tab that the viewer joins as Dee. This batch, in delivery order: purse setup (<a class="dv-oid" href="#2a">2a</a>–<a class="dv-oid" href="#2b">2b</a>), settling (<a class="dv-oid" href="#2c">2c</a>), the four degraded states (<a class="dv-oid" href="#2d">2d</a>–<a class="dv-oid" href="#2g">2g</a>), then add, pending, history, verify, create, empty (<a class="dv-oid" href="#2h">2h</a>–<a class="dv-oid" href="#2m">2m</a>). Viewer is Dee unless the label says otherwise. Bone check = verified/available; amber remains settled-only.</div>
+<div class="dv-opts">
+
+<div class="dv-opt" id="2a">
+<div class="dv-olabel"><a class="dv-oid" href="#2a">2a</a>Screen 7 — Purse setup, step 1 · the binding</div>
+<div class="ph">
+<div class="tka" data-screen-label="07a Purse binding" style="width:100%;height:100%;background:var(--pg);color:var(--tx);font-family:Mulish,system-ui,sans-serif;display:flex;flex-direction:column;padding:24px 20px 0;box-sizing:border-box">
+  <div style="display:flex;align-items:center;gap:6px">
+    <div role="button" style="width:38px;height:44px;display:flex;align-items:center;cursor:pointer"><svg width="10" height="18" viewBox="0 0 10 18" fill="none"><path d="M9 1L1 9l8 8" style="stroke:var(--sec)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg></div>
+    <div style="flex:1"><div style="font-size:16px;font-weight:800">Set up your purse</div><div style="font-size:11.5px;color:var(--mut);font-weight:700">Optional — skippable forever</div></div>
+  </div>
+  <div style="height:20px"></div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <div style="display:flex;gap:5px"><div style="width:22px;height:4px;border-radius:2px;background:var(--tx)"></div><div style="width:22px;height:4px;border-radius:2px;background:var(--hl)"></div></div>
+    <span style="font-size:11.5px;color:var(--mut);font-weight:700">Step 1 of 2 — one signature</span>
+  </div>
+  <div style="height:16px"></div>
+  <div style="font-size:23px;font-weight:900;line-height:1.25">Sign once, settle without dialogs</div>
+  <div style="margin-top:10px;font-size:13.5px;color:var(--sec);font-weight:600;line-height:1.6">One signature derives a small spending key — the purse. It pays your settlements while Tally is open. Your Nimiq Pay key is used exactly twice: this signature, and the top-up that follows.</div>
+  <div style="height:22px"></div>
+  <div style="font-size:10.5px;font-weight:800;letter-spacing:0.14em;color:var(--mut);text-transform:uppercase">Plain truths</div>
+  <div style="padding:11px 0 10px;border-bottom:1px solid var(--hl)">
+    <div style="font-size:14px;font-weight:800">A cash drawer, not a vault</div>
+    <div style="margin-top:3px;font-size:12px;color:var(--sec);font-weight:600;line-height:1.5">It lives in this app, on this device. Keep pocket money in it, not savings.</div>
+  </div>
+  <div style="padding:11px 0 10px;border-bottom:1px solid var(--hl)">
+    <div style="font-size:14px;font-weight:800">The balance is the entire risk</div>
+    <div style="margin-top:3px;font-size:12px;color:var(--sec);font-weight:600;line-height:1.5">Whatever the purse holds is all that can ever be lost. Nothing outside it can be touched.</div>
+  </div>
+  <div style="padding:11px 0 10px;border-bottom:1px solid var(--hl)">
+    <div style="font-size:14px;font-weight:800">Withdraw everything, one tap</div>
+    <div style="margin-top:3px;font-size:12px;color:var(--sec);font-weight:600;line-height:1.5">From any screen, any time. Same account re-creates the purse on any device — nothing to write down.</div>
+  </div>
+  <div style="padding:11px 0 10px">
+    <div style="font-size:14px;font-weight:800">Skipping costs one tap per payment</div>
+    <div style="margin-top:3px;font-size:12px;color:var(--sec);font-weight:600;line-height:1.5">No purse means Nimiq Pay asks before each settlement. Everything else works the same.</div>
+  </div>
+  <div style="margin-top:auto;padding:12px 0 20px;display:flex;flex-direction:column;gap:9px">
+    <div style="font-size:12px;color:var(--sec);text-align:center;font-weight:600">Nimiq Pay will ask you to sign one message. Signing is free and moves nothing.</div>
+    <div role="button" style="height:56px;border-radius:16px;background:var(--btn);color:var(--btnTx);font-size:16px;font-weight:800;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:var(--btnHov)">Sign the binding</div>
+    <div role="button" style="height:44px;display:flex;align-items:center;justify-content:center;font-size:13.5px;font-weight:800;color:var(--sec);cursor:pointer" style-hover="color:var(--tx)">Skip — settle manually</div>
+  </div>
+</div>
+</div>
+</div>
+
+<div class="dv-opt" id="2b">
+<div class="dv-olabel"><a class="dv-oid" href="#2b">2b</a>Screen 7 — Purse setup, step 2 · funding</div>
+<div class="ph">
+<div class="tka" data-screen-label="07b Purse funding" style="width:100%;height:100%;background:var(--pg);color:var(--tx);font-family:Mulish,system-ui,sans-serif;display:flex;flex-direction:column;padding:24px 20px 0;box-sizing:border-box">
+  <div style="display:flex;align-items:center;gap:6px">
+    <div role="button" style="width:38px;height:44px;display:flex;align-items:center;cursor:pointer"><svg width="10" height="18" viewBox="0 0 10 18" fill="none"><path d="M9 1L1 9l8 8" style="stroke:var(--sec)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg></div>
+    <div style="flex:1"><div style="font-size:16px;font-weight:800">Fund the purse</div><div style="font-size:11.5px;color:var(--mut);font-weight:700">Step 2 of 2 — the top-up</div></div>
+  </div>
+  <div style="height:20px"></div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <div style="display:flex;gap:5px"><div style="width:22px;height:4px;border-radius:2px;background:var(--tx)"></div><div style="width:22px;height:4px;border-radius:2px;background:var(--tx)"></div></div>
+    <span style="font-size:11.5px;color:var(--mut);font-weight:700">Signature done — purse bound</span>
+  </div>
+  <div style="height:30px"></div>
+  <div style="text-align:center">
+    <div style="font-size:54px;font-weight:900;letter-spacing:-0.02em;line-height:1">2,000<span style="font-size:16px;font-weight:700;color:var(--mut);margin-left:8px">NIM</span></div>
+    <div style="margin-top:10px;font-size:12.5px;color:var(--sec);font-weight:600">A soft ceiling, not a lock — top up or withdraw any time</div>
+  </div>
+  <div style="height:20px"></div>
+  <div style="display:flex;justify-content:center;gap:8px">
+    <div role="button" style="height:40px;border:1px solid var(--hl);border-radius:999px;padding:0 15px;display:flex;align-items:center;font-size:13px;font-weight:800;color:var(--sec);cursor:pointer" style-hover="border-color:var(--sec)">500</div>
+    <div role="button" style="height:40px;border:1px solid var(--hl);border-radius:999px;padding:0 15px;display:flex;align-items:center;font-size:13px;font-weight:800;color:var(--sec);cursor:pointer" style-hover="border-color:var(--sec)">1,000</div>
+    <div role="button" style="height:40px;border:1px solid transparent;border-radius:999px;padding:0 15px;display:flex;align-items:center;font-size:13px;font-weight:800;background:var(--btn);color:var(--btnTx);cursor:pointer">2,000</div>
+    <div role="button" style="height:40px;border:1px solid var(--hl);border-radius:999px;padding:0 15px;display:flex;align-items:center;font-size:13px;font-weight:800;color:var(--sec);cursor:pointer" style-hover="border-color:var(--sec)">5,000</div>
+  </div>
+  <div style="height:26px"></div>
+  <div style="display:flex;align-items:center;height:52px;border-bottom:1px solid var(--hl)">
+    <span style="width:64px;font-size:12px;color:var(--mut);font-weight:700">From</span>
+    <span style="font-size:13.5px;font-weight:700">Main account <span style="color:var(--mut);font-family:ui-monospace,Menlo,monospace;font-size:12px">NQ07 …R2K4</span></span>
+  </div>
+  <div style="display:flex;align-items:center;height:52px;border-bottom:1px solid var(--hl)">
+    <span style="width:64px;font-size:12px;color:var(--mut);font-weight:700">To</span>
+    <span style="font-size:13.5px;font-weight:700">Your Tally purse <span style="color:var(--mut);font-family:ui-monospace,Menlo,monospace;font-size:12px">NQ42 …8LMD</span></span>
+  </div>
+  <div style="display:flex;align-items:center;height:52px">
+    <span style="width:64px;font-size:12px;color:var(--mut);font-weight:700">Fee</span>
+    <span style="font-size:13.5px;font-weight:700">0 NIM <span style="color:var(--mut)">— always</span></span>
+  </div>
+  <div style="margin-top:auto;padding:12px 0 20px;display:flex;flex-direction:column;gap:9px">
+    <div style="font-size:12px;color:var(--sec);text-align:center;font-weight:600">Nimiq Pay will ask you to approve this transfer. Second dialog, last dialog.</div>
+    <div role="button" style="height:56px;border-radius:16px;background:var(--btn);color:var(--btnTx);font-size:16px;font-weight:800;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:var(--btnHov)">Send 2,000 to the purse</div>
+    <div role="button" style="height:44px;display:flex;align-items:center;justify-content:center;font-size:13.5px;font-weight:800;color:var(--sec);cursor:pointer" style-hover="color:var(--tx)">Not now</div>
+  </div>
+</div>
+</div>
+</div>
+
+<div class="dv-opt" id="2c">
+<div class="dv-olabel"><a class="dv-oid" href="#2c">2c</a>Screen 6 — Settling · per-leg state, block countdown</div>
+<div class="ph">
+<div class="tka" data-screen-label="06 Settling" style="width:100%;height:100%;background:var(--pg);color:var(--tx);font-family:Mulish,system-ui,sans-serif;display:flex;flex-direction:column;padding:24px 20px 0;box-sizing:border-box">
+  <div style="display:flex;align-items:center;gap:6px">
+    <div role="button" style="width:38px;height:44px;display:flex;align-items:center;cursor:pointer"><svg width="10" height="18" viewBox="0 0 10 18" fill="none"><path d="M9 1L1 9l8 8" style="stroke:var(--sec)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg></div>
+    <div style="flex:1"><div style="font-size:16px;font-weight:800">Settling</div><div style="font-size:11.5px;color:var(--mut);font-weight:700">Round 7 · 1 of 2 landed</div></div>
+    <div style="display:flex;align-items:center;gap:6px;border:1px solid var(--hl);border-radius:999px;padding:0 12px;height:30px;font-size:12px;font-weight:700;color:var(--sec)">Purse<span style="color:var(--tx);font-weight:800">2,000</span></div>
+  </div>
+  <div style="height:30px"></div>
+  <div style="text-align:center">
+    <div style="font-size:10.5px;font-weight:800;letter-spacing:0.14em;color:var(--mut);text-transform:uppercase">Finality in</div>
+    <div style="margin-top:8px;font-size:64px;font-weight:900;letter-spacing:-0.02em;line-height:1">41<span style="font-size:16px;font-weight:700;color:var(--mut);margin-left:8px">blocks</span></div>
+    <div style="margin-top:10px;font-size:12.5px;color:var(--sec);font-weight:600">macro block #41,220 · about 41 seconds</div>
+    <div style="margin:16px auto 0;width:240px;height:4px;border-radius:2px;background:var(--hl)"><div style="width:66%;height:100%;border-radius:2px;background:var(--tx)"></div></div>
+  </div>
+  <div style="height:30px"></div>
+  <div style="font-size:10.5px;font-weight:800;letter-spacing:0.14em;color:var(--mut);text-transform:uppercase">Transfers</div>
+  <div style="display:flex;align-items:center;gap:12px;height:62px;border-bottom:1px solid var(--hl)">
+    <div style="flex:1;min-width:0"><div style="font-size:15px;font-weight:800">Ada <span style="color:var(--mut);font-weight:700">→</span> Dee</div><div style="margin-top:2px;font-size:11.5px;font-weight:700"><span style="color:var(--ambT);font-weight:800">Settled</span><span style="color:var(--mut)"> · anchored at #41,140</span></div></div>
+    <span style="font-size:17px;font-weight:900">1,200</span>
+    <svg width="15" height="15" viewBox="0 0 14 14" fill="none"><path d="M2 7.5L5.5 11L12 3.5" style="stroke:var(--ambT)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px;height:62px;border-bottom:1px solid var(--hl)">
+    <div style="flex:1;min-width:0"><div style="font-size:15px;font-weight:800">Bo <span style="color:var(--mut);font-weight:700">→</span> Dee</div><div style="margin-top:2px;font-size:11.5px;color:var(--mut);font-weight:700">Confirming — lands at the macro block</div></div>
+    <span style="font-size:17px;font-weight:900">300</span>
+    <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><circle cx="7.5" cy="7.5" r="6" style="stroke:var(--sec)" stroke-width="1.8" stroke-dasharray="3 3.4"></circle></svg>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px;height:52px">
+    <div style="flex:1;font-size:12.5px;color:var(--mut);font-weight:600">Cy nets to zero — nothing to send</div>
+    <span style="font-size:15px;font-weight:800;color:var(--mut)">0</span>
+  </div>
+  <div style="margin-top:auto;padding:12px 0 20px;display:flex;flex-direction:column;gap:10px">
+    <div style="font-size:13px;color:var(--sec);text-align:center;font-weight:600">You receive <span style="color:var(--tx);font-weight:800">1,500 NIM</span> when the round closes — nothing for you to do.</div>
+    <div role="button" style="height:48px;border:1px solid var(--hl);border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:14.5px;font-weight:800;cursor:pointer" style-hover="border-color:var(--sec)">Back to the tab</div>
+  </div>
+</div>
+</div>
+</div>
+
+<div class="dv-opt" id="2d">
+<div class="dv-olabel"><a class="dv-oid" href="#2d">2d</a>Screen 13a — Dialog declined · a normal outcome</div>
+<div class="ph">
+<div class="tka" data-screen-label="13a Dialog declined" style="width:100%;height:100%;background:var(--pg);color:var(--tx);font-family:Mulish,system-ui,sans-serif;display:flex;flex-direction:column;padding:24px 20px 0;box-sizing:border-box">
+  <div style="display:flex;align-items:center;gap:6px">
+    <div role="button" style="width:38px;height:44px;display:flex;align-items:center;cursor:pointer"><svg width="10" height="18" viewBox="0 0 10 18" fill="none"><path d="M9 1L1 9l8 8" style="stroke:var(--sec)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg></div>
+    <div style="flex:1;font-size:16px;font-weight:800">Purse setup</div>
+  </div>
+  <div style="height:44px"></div>
+  <div style="font-size:23px;font-weight:900;line-height:1.25">You said not now</div>
+  <div style="margin-top:10px;font-size:13.5px;color:var(--sec);font-weight:600;line-height:1.6">Nothing was signed and nothing moved. You're in manual mode — a complete Tally that asks once per payment.</div>
+  <div style="height:26px"></div>
+  <div style="font-size:10.5px;font-weight:800;letter-spacing:0.14em;color:var(--mut);text-transform:uppercase">You can still</div>
+  <div style="display:flex;align-items:center;gap:12px;height:58px;border-bottom:1px solid var(--hl)">
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7.5L5.5 11L12 3.5" style="stroke:var(--tx)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" opacity="0.85"></path></svg>
+    <div style="flex:1"><div style="font-size:14px;font-weight:800">Track, accept and dispute</div><div style="font-size:11.5px;color:var(--mut);font-weight:600">the full ledger, zero dialogs</div></div>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px;height:58px;border-bottom:1px solid var(--hl)">
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7.5L5.5 11L12 3.5" style="stroke:var(--tx)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" opacity="0.85"></path></svg>
+    <div style="flex:1"><div style="font-size:14px;font-weight:800">Settle manually</div><div style="font-size:11.5px;color:var(--mut);font-weight:600">one approval per payment</div></div>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px;height:58px">
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7.5L5.5 11L12 3.5" style="stroke:var(--tx)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" opacity="0.85"></path></svg>
+    <div style="flex:1"><div style="font-size:14px;font-weight:800">Add the purse later</div><div style="font-size:11.5px;color:var(--mut);font-weight:600">Settings → Purse · same two steps</div></div>
+  </div>
+  <div style="margin-top:auto;padding:12px 0 20px;display:flex;flex-direction:column;gap:9px">
+    <div role="button" style="height:56px;border-radius:16px;background:var(--btn);color:var(--btnTx);font-size:16px;font-weight:800;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:var(--btnHov)">Keep going</div>
+    <div role="button" style="height:44px;display:flex;align-items:center;justify-content:center;font-size:13.5px;font-weight:800;color:var(--sec);cursor:pointer" style-hover="color:var(--tx)">Try the signature again</div>
+  </div>
+</div>
+</div>
+</div>
+
+<div class="dv-opt" id="2e">
+<div class="dv-olabel"><a class="dv-oid" href="#2e">2e</a>Screen 13b — Purse underfunded · viewer: Ada</div>
+<div class="ph">
+<div class="tka" data-screen-label="13b Underfunded" style="width:100%;height:100%;background:var(--pg);color:var(--tx);font-family:Mulish,system-ui,sans-serif;display:flex;flex-direction:column;padding:24px 20px 0;box-sizing:border-box">
+  <div style="display:flex;align-items:center;gap:6px">
+    <div role="button" style="width:38px;height:44px;display:flex;align-items:center;cursor:pointer"><svg width="10" height="18" viewBox="0 0 10 18" fill="none"><path d="M9 1L1 9l8 8" style="stroke:var(--sec)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg></div>
+    <div style="flex:1"><div style="font-size:16px;font-weight:800">Settling</div><div style="font-size:11.5px;color:var(--mut);font-weight:700">Round 7 · partial — a normal state</div></div>
+    <div style="display:flex;align-items:center;gap:6px;border:1px solid var(--hl);border-radius:999px;padding:0 12px;height:30px;font-size:12px;font-weight:700;color:var(--sec)">Purse<span style="color:var(--tx);font-weight:800">800</span></div>
+  </div>
+  <div style="height:32px"></div>
+  <div style="text-align:center">
+    <div style="font-size:10.5px;font-weight:800;letter-spacing:0.14em;color:var(--mut);text-transform:uppercase">Your purse</div>
+    <div style="margin-top:8px;font-size:56px;font-weight:900;letter-spacing:-0.02em;line-height:1">800<span style="font-size:16px;font-weight:700;color:var(--mut);margin-left:8px">of 1,200</span></div>
+    <div style="margin:14px auto 0;max-width:300px;font-size:13px;color:var(--sec);font-weight:600;line-height:1.6">Your leg sat out this round and carries forward. The rest settled without waiting.</div>
+  </div>
+  <div style="height:28px"></div>
+  <div style="font-size:10.5px;font-weight:800;letter-spacing:0.14em;color:var(--mut);text-transform:uppercase">This round</div>
+  <div style="display:flex;align-items:center;gap:12px;height:62px;border-bottom:1px solid var(--hl)">
+    <div style="flex:1;min-width:0"><div style="font-size:15px;font-weight:800">You <span style="color:var(--mut);font-weight:700">→</span> Dee</div><div style="margin-top:2px;font-size:11.5px;color:var(--mut);font-weight:700">Skipped — carries to the next round</div></div>
+    <span style="font-size:17px;font-weight:900;color:var(--mut)">1,200</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px;height:62px">
+    <div style="flex:1;min-width:0"><div style="font-size:15px;font-weight:800">Bo <span style="color:var(--mut);font-weight:700">→</span> Dee</div><div style="margin-top:2px;font-size:11.5px;font-weight:700"><span style="color:var(--ambT);font-weight:800">Settled</span><span style="color:var(--mut)"> · anchored at #41,161</span></div></div>
+    <span style="font-size:17px;font-weight:900">300</span>
+    <svg width="15" height="15" viewBox="0 0 14 14" fill="none"><path d="M2 7.5L5.5 11L12 3.5" style="stroke:var(--ambT)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+  </div>
+  <div style="margin-top:auto;padding:12px 0 20px;display:flex;flex-direction:column;gap:9px">
+    <div style="font-size:12px;color:var(--sec);text-align:center;font-weight:600">One approval in Nimiq Pay — withdraw any time.</div>
+    <div role="button" style="height:56px;border-radius:16px;background:var(--btn);color:var(--btnTx);font-size:16px;font-weight:800;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:var(--btnHov)">Top up 400</div>
+    <div role="button" style="height:44px;display:flex;align-items:center;justify-content:center;font-size:13.5px;font-weight:800;color:var(--sec);cursor:pointer" style-hover="color:var(--tx)">Later</div>
+  </div>
+</div>
+</div>
+</div>
+
+<div class="dv-opt" id="2f">
+<div class="dv-olabel"><a class="dv-oid" href="#2f">2f</a>Screen 13c — Consensus lost · recording still works</div>
+<div class="ph">
+<div class="tka" data-screen-label="13c Consensus lost" style="width:100%;height:100%;background:var(--pg);color:var(--tx);font-family:Mulish,system-ui,sans-serif;display:flex;flex-direction:column;padding:0 20px;box-sizing:border-box">
+  <div style="margin:0 -20px;padding:12px 20px;background:var(--card);border-bottom:1px solid var(--hl);display:flex;align-items:center;gap:9px">
+    <div style="width:8px;height:8px;border-radius:50%;background:var(--sec)"></div>
+    <span style="flex:1;font-size:13px;font-weight:800">No consensus — reconnecting</span>
+    <span style="font-size:11.5px;color:var(--mut);font-weight:700">1 of 4 peers</span>
+  </div>
+  <div style="height:18px"></div>
+  <div style="display:flex;align-items:center;justify-content:space-between">
+    <div style="display:flex;align-items:center;gap:8px">
+      <svg width="15" height="15" viewBox="0 0 18 18" fill="none"><rect x="4.2" y="0.5" width="4.2" height="17" rx="1.4" style="fill:var(--tx)"></rect><rect x="9.6" y="0.5" width="4.2" height="17" rx="1.4" style="fill:var(--tx)"></rect><rect x="4.2" y="5" width="8.2" height="1.9" style="fill:var(--pg)"></rect><rect x="5.8" y="8.8" width="8" height="1.9" style="fill:var(--pg)"></rect><rect x="4.2" y="12.8" width="9.6" height="1.9" style="fill:var(--ambF)"></rect></svg>
+      <span style="font-size:15px;font-weight:800">Porto, June</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;border:1px solid var(--hl);border-radius:999px;padding:0 12px;height:30px;font-size:12px;font-weight:700;color:var(--sec)">Purse<span style="color:var(--tx);font-weight:800">2,000</span></div>
+  </div>
+  <div style="height:30px"></div>
+  <div style="text-align:center">
+    <div style="font-size:10.5px;font-weight:800;letter-spacing:0.14em;color:var(--mut);text-transform:uppercase">Your position</div>
+    <div style="margin-top:10px;font-size:56px;font-weight:900;letter-spacing:-0.02em;line-height:1"><span style="color:var(--mut);font-weight:700">+</span>1,500<span style="font-size:16px;font-weight:700;color:var(--mut);margin-left:8px">NIM</span></div>
+    <div style="margin-top:12px;font-size:14.5px;color:var(--sec);font-weight:600">You're owed 1,500 NIM</div>
+    <div style="margin-top:18px;display:flex;justify-content:center">
+      <div style="height:40px;border:1px solid var(--hl);border-radius:999px;padding:0 18px;display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:800;color:var(--mut)"><span style="letter-spacing:2px">‖</span>Settlement paused — resumes on reconnect</div>
+    </div>
+  </div>
+  <div style="height:30px"></div>
+  <div style="font-size:10.5px;font-weight:800;letter-spacing:0.14em;color:var(--mut);text-transform:uppercase">Activity</div>
+  <div style="display:flex;align-items:center;gap:10px;height:58px;border-bottom:1px solid var(--hl)">
+    <div style="flex:1;min-width:0"><div style="font-size:13.5px;color:var(--sec);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">You added <span style="color:var(--tx);font-weight:800">Groceries</span></div><div style="margin-top:2px;font-size:11px;color:var(--mut);font-weight:700">recorded on this device — syncs when consensus returns</div></div>
+    <span style="font-size:14px;font-weight:800">240</span><span style="font-size:11.5px;color:var(--mut);font-weight:600">now</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px;height:50px">
+    <div style="flex:1;font-size:13.5px;color:var(--sec);font-weight:600;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Cy accepted <span style="color:var(--tx);font-weight:800">Wine night</span></div>
+    <span style="font-size:14px;font-weight:800">500</span><span style="font-size:11.5px;color:var(--mut);font-weight:600">2h</span>
+  </div>
+  <div style="margin-top:auto;padding:12px 0 20px;display:flex;flex-direction:column;gap:9px">
+    <div style="font-size:12px;color:var(--sec);text-align:center;font-weight:600">Recording works offline. Money won't move until reconnected.</div>
+    <div role="button" style="height:56px;border-radius:16px;background:var(--btn);color:var(--btnTx);font-size:16px;font-weight:800;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:var(--btnHov)">Add expense</div>
+  </div>
+</div>
+</div>
+</div>
+
+<div class="dv-opt" id="2g">
+<div class="dv-olabel"><a class="dv-oid" href="#2g">2g</a>Screen 13d — Ledger log forked · rounds refuse to open</div>
+<div class="ph">
+<div class="tka" data-screen-label="13d Log forked" style="width:100%;height:100%;background:var(--pg);color:var(--tx);font-family:Mulish,system-ui,sans-serif;display:flex;flex-direction:column;padding:24px 20px 0;box-sizing:border-box">
+  <div style="display:flex;align-items:center;gap:6px">
+    <div role="button" style="width:38px;height:44px;display:flex;align-items:center;cursor:pointer"><svg width="10" height="18" viewBox="0 0 10 18" fill="none"><path d="M9 1L1 9l8 8" style="stroke:var(--sec)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg></div>
+    <div style="flex:1"><div style="font-size:16px;font-weight:800">This tab's log</div><div style="font-size:11.5px;color:var(--mut);font-weight:700">Fork detected</div></div>
+  </div>
+  <div style="height:36px"></div>
+  <div style="font-size:23px;font-weight:900;line-height:1.25">The copies disagree</div>
+  <div style="margin-top:10px;font-size:13.5px;color:var(--sec);font-weight:600;line-height:1.6">Your history and Bo's diverge after entry #37. Rounds refuse to open on a forked log — no money can move until every copy matches.</div>
+  <div style="height:26px"></div>
+  <div style="font-size:10.5px;font-weight:800;letter-spacing:0.14em;color:var(--mut);text-transform:uppercase">Heads</div>
+  <div style="display:flex;align-items:center;height:54px;border-bottom:1px solid var(--hl)">
+    <span style="width:130px;font-size:12.5px;color:var(--mut);font-weight:700">Yours</span>
+    <span style="font-family:ui-monospace,Menlo,monospace;font-size:13px;font-weight:600">a91f <span style="color:var(--mut)">· 42 entries</span></span>
+  </div>
+  <div style="display:flex;align-items:center;height:54px;border-bottom:1px solid var(--hl)">
+    <span style="width:130px;font-size:12.5px;color:var(--mut);font-weight:700">Bo's</span>
+    <span style="font-family:ui-monospace,Menlo,monospace;font-size:13px;font-weight:600">77c3 <span style="color:var(--mut)">· 41 entries</span></span>
+  </div>
+  <div style="display:flex;align-items:center;height:54px">
+    <span style="width:130px;font-size:12.5px;color:var(--mut);font-weight:700">Common ancestor</span>
+    <span style="font-family:ui-monospace,Menlo,monospace;font-size:13px;font-weight:600">entry #37 <span style="color:var(--mut)">· 14 Jun, 18:02</span></span>
+  </div>
+  <div style="margin-top:22px;font-size:12.5px;color:var(--mut);font-weight:600;line-height:1.6">Forks are detected, never hidden. Export your signed log and compare out of band — it needs no cooperation from Tally.</div>
+  <div style="margin-top:auto;padding:12px 0 20px;display:flex;flex-direction:column;gap:9px">
+    <div role="button" style="height:56px;border-radius:16px;background:var(--btn);color:var(--btnTx);font-size:16px;font-weight:800;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:var(--btnHov)">Re-sync now</div>
+    <div role="button" style="height:44px;display:flex;align-items:center;justify-content:center;font-size:13.5px;font-weight:800;color:var(--sec);cursor:pointer" style-hover="color:var(--tx)">Export signed log</div>
+  </div>
+</div>
+</div>
+</div>
+
+<div class="dv-opt" id="2h">
+<div class="dv-olabel"><a class="dv-oid" href="#2h">2h</a>Screen 3 — Add obligation · under ten seconds</div>
+<div class="ph">
+<div class="tka" data-screen-label="03 Add obligation" style="width:100%;height:100%;background:var(--pg);color:var(--tx);font-family:Mulish,system-ui,sans-serif;display:flex;flex-direction:column;padding:24px 20px 0;box-sizing:border-box">
+  <div style="display:flex;align-items:center;gap:6px">
+    <div role="button" style="width:38px;height:44px;display:flex;align-items:center;font-size:22px;color:var(--sec);cursor:pointer" style-hover="color:var(--tx)">×</div>
+    <div style="flex:1;font-size:16px;font-weight:800">Add expense</div>
+  </div>
+  <div style="text-align:center;padding:16px 0 4px">
+    <span style="font-size:54px;font-weight:900;letter-spacing:-0.02em">1,200</span><span style="font-size:15px;color:var(--mut);font-weight:700;margin-left:8px">NIM</span>
+  </div>
+  <div style="height:14px"></div>
+  <div style="height:52px;border:1px solid var(--hl);border-radius:14px;display:flex;align-items:center;padding:0 16px;font-size:14.5px;font-weight:700">Airbnb balance</div>
+  <div style="height:16px"></div>
+  <div style="font-size:10.5px;font-weight:800;letter-spacing:0.14em;color:var(--mut);text-transform:uppercase">Split with</div>
+  <div style="margin-top:10px;display:flex;gap:8px">
+    <div role="button" style="height:40px;border:1px solid transparent;border-radius:999px;padding:0 16px;display:flex;align-items:center;font-size:13.5px;font-weight:800;background:var(--btn);color:var(--btnTx);cursor:pointer">Ada</div>
+    <div role="button" style="height:40px;border:1px solid var(--hl);border-radius:999px;padding:0 16px;display:flex;align-items:center;font-size:13.5px;font-weight:800;color:var(--sec);cursor:pointer" style-hover="border-color:var(--sec)">Bo</div>
+    <div role="button" style="height:40px;border:1px solid var(--hl);border-radius:999px;padding:0 16px;display:flex;align-items:center;font-size:13.5px;font-weight:800;color:var(--sec);cursor:pointer" style-hover="border-color:var(--sec)">Cy</div>
+  </div>
+  <div style="margin-top:10px;font-size:12px;color:var(--mut);font-weight:600">You paid — Ada owes you all of it, 1,200 NIM</div>
+  <div style="margin-top:16px;display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+    <div role="button" style="height:52px;border-radius:14px;background:var(--card);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;cursor:pointer" style-hover="background:var(--cardHov)">1</div>
+    <div role="button" style="height:52px;border-radius:14px;background:var(--card);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;cursor:pointer" style-hover="background:var(--cardHov)">2</div>
+    <div role="button" style="height:52px;border-radius:14px;background:var(--card);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;cursor:pointer" style-hover="background:var(--cardHov)">3</div>
+    <div role="button" style="height:52px;border-radius:14px;background:var(--card);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;cursor:pointer" style-hover="background:var(--cardHov)">4</div>
+    <div role="button" style="height:52px;border-radius:14px;background:var(--card);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;cursor:pointer" style-hover="background:var(--cardHov)">5</div>
+    <div role="button" style="height:52px;border-radius:14px;background:var(--card);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;cursor:pointer" style-hover="background:var(--cardHov)">6</div>
+    <div role="button" style="height:52px;border-radius:14px;background:var(--card);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;cursor:pointer" style-hover="background:var(--cardHov)">7</div>
+    <div role="button" style="height:52px;border-radius:14px;background:var(--card);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;cursor:pointer" style-hover="background:var(--cardHov)">8</div>
+    <div role="button" style="height:52px;border-radius:14px;background:var(--card);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;cursor:pointer" style-hover="background:var(--cardHov)">9</div>
+    <div role="button" style="height:52px;border-radius:14px;background:var(--card);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;color:var(--sec);cursor:pointer" style-hover="background:var(--cardHov)">.</div>
+    <div role="button" style="height:52px;border-radius:14px;background:var(--card);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;cursor:pointer" style-hover="background:var(--cardHov)">0</div>
+    <div role="button" style="height:52px;border-radius:14px;background:var(--card);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:var(--sec);cursor:pointer" style-hover="background:var(--cardHov)">⌫</div>
+  </div>
+  <div style="margin-top:auto;padding:12px 0 20px;display:flex;flex-direction:column;gap:9px">
+    <div role="button" style="height:56px;border-radius:16px;background:var(--btn);color:var(--btnTx);font-size:16px;font-weight:800;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:var(--btnHov)">Request 1,200 from Ada</div>
+    <div style="font-size:11.5px;color:var(--mut);text-align:center;font-weight:600">Ada accepts with one tap · silence never counts</div>
+  </div>
+</div>
+</div>
+</div>
+
+<div class="dv-opt" id="2i">
+<div class="dv-olabel"><a class="dv-oid" href="#2i">2i</a>Screen 4 — Pending requests · viewer: Cy · accept and reject weigh the same</div>
+<div class="ph">
+<div class="tka" data-screen-label="04 Pending requests" style="width:100%;height:100%;background:var(--pg);color:var(--tx);font-family:Mulish,system-ui,sans-serif;display:flex;flex-direction:column;padding:24px 20px 0;box-sizing:border-box">
+  <div style="display:flex;align-items:center;gap:6px">
+    <div role="button" style="width:38px;height:44px;display:flex;align-items:center;cursor:pointer"><svg width="10" height="18" viewBox="0 0 10 18" fill="none"><path d="M9 1L1 9l8 8" style="stroke:var(--sec)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg></div>
+    <div style="flex:1"><div style="font-size:16px;font-weight:800">Waiting on you</div><div style="font-size:11.5px;color:var(--mut);font-weight:700">2 requests</div></div>
+    <div style="display:flex;align-items:center;gap:6px;border:1px solid var(--hl);border-radius:999px;padding:0 12px;height:30px;font-size:12px;font-weight:700;color:var(--sec)">Purse<span style="color:var(--tx);font-weight:800">1,500</span></div>
+  </div>
+  <div style="height:18px"></div>
+  <div style="border:1px solid var(--hl);border-radius:18px;padding:16px">
+    <div style="display:flex;align-items:baseline;justify-content:space-between"><span style="font-size:12px;color:var(--sec);font-weight:700">Ada requests</span><span style="font-size:11.5px;color:var(--mut);font-weight:600">2d</span></div>
+    <div style="margin-top:8px;font-size:38px;font-weight:900;letter-spacing:-0.02em;line-height:1">500<span style="font-size:14px;font-weight:700;color:var(--mut);margin-left:7px">NIM</span></div>
+    <div style="margin-top:6px;font-size:14.5px;font-weight:700">Wine night</div>
+    <div style="margin-top:14px;display:flex;gap:10px">
+      <div role="button" style="flex:1;height:50px;border:1px solid var(--hl);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:14.5px;font-weight:800;cursor:pointer" style-hover="border-color:var(--sec)">Reject</div>
+      <div role="button" style="flex:1;height:50px;border:1px solid var(--hl);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:14.5px;font-weight:800;cursor:pointer" style-hover="border-color:var(--sec)">Accept</div>
+    </div>
+  </div>
+  <div style="height:14px"></div>
+  <div style="border:1px solid var(--hl);border-radius:18px;padding:16px">
+    <div style="display:flex;align-items:baseline;justify-content:space-between"><span style="font-size:12px;color:var(--sec);font-weight:700">Bo requests</span><span style="font-size:11.5px;color:var(--mut);font-weight:600">5h</span></div>
+    <div style="margin-top:8px;font-size:38px;font-weight:900;letter-spacing:-0.02em;line-height:1">250<span style="font-size:14px;font-weight:700;color:var(--mut);margin-left:7px">NIM</span></div>
+    <div style="margin-top:6px;font-size:14.5px;font-weight:700">Taxi from the airport</div>
+    <div style="margin-top:14px;display:flex;gap:10px">
+      <div role="button" style="flex:1;height:50px;border:1px solid var(--hl);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:14.5px;font-weight:800;cursor:pointer" style-hover="border-color:var(--sec)">Reject</div>
+      <div role="button" style="flex:1;height:50px;border:1px solid var(--hl);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:14.5px;font-weight:800;cursor:pointer" style-hover="border-color:var(--sec)">Accept</div>
+    </div>
+  </div>
+  <div style="margin-top:auto;padding:0 0 24px">
+    <div style="font-size:12px;color:var(--mut);text-align:center;font-weight:600;line-height:1.6">Nothing counts until you decide. A request never becomes a debt on its own — silence is never a yes. Rejecting keeps both signatures on the record.</div>
+  </div>
+</div>
+</div>
+</div>
+
+<div class="dv-opt" id="2j">
+<div class="dv-olabel"><a class="dv-oid" href="#2j">2j</a>Screen 9 — History · settled rounds carry their anchors</div>
+<div class="ph">
+<div class="tka" data-screen-label="09 History" style="width:100%;height:100%;background:var(--pg);color:var(--tx);font-family:Mulish,system-ui,sans-serif;display:flex;flex-direction:column;padding:24px 20px 0;box-sizing:border-box">
+  <div style="display:flex;align-items:center;gap:6px">
+    <div role="button" style="width:38px;height:44px;display:flex;align-items:center;cursor:pointer"><svg width="10" height="18" viewBox="0 0 10 18" fill="none"><path d="M9 1L1 9l8 8" style="stroke:var(--sec)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg></div>
+    <div style="flex:1;font-size:16px;font-weight:800">History</div>
+    <div style="display:flex;align-items:center;gap:6px;border:1px solid var(--hl);border-radius:999px;padding:0 12px;height:30px;font-size:12px;font-weight:700;color:var(--sec)">Purse<span style="color:var(--tx);font-weight:800">2,000</span></div>
+  </div>
+  <div style="height:16px"></div>
+  <div style="font-size:10.5px;font-weight:800;letter-spacing:0.14em;color:var(--mut);text-transform:uppercase">Open</div>
+  <div style="display:flex;align-items:center;gap:10px;height:46px;border-bottom:1px solid var(--hl)">
+    <div style="flex:1;font-size:13.5px;color:var(--sec);font-weight:600;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Cy accepted <span style="color:var(--tx);font-weight:800">Wine night</span></div>
+    <span style="font-size:14px;font-weight:800">500</span><span style="font-size:11.5px;color:var(--mut);font-weight:600">2h</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px;height:46px;border-bottom:1px solid var(--hl)">
+    <div style="flex:1;font-size:13.5px;color:var(--sec);font-weight:600;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Bo accepted <span style="color:var(--tx);font-weight:800">Fuel</span></div>
+    <span style="font-size:14px;font-weight:800">300</span><span style="font-size:11.5px;color:var(--mut);font-weight:600">4h</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px;height:46px">
+    <div style="flex:1;font-size:13.5px;color:var(--sec);font-weight:600">You joined the tab</div>
+    <span style="font-size:11.5px;color:var(--mut);font-weight:600">6h</span>
+  </div>
+  <div style="height:20px"></div>
+  <div style="display:flex;align-items:center;gap:8px">
+    <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M2 7.5L5.5 11L12 3.5" style="stroke:var(--ambT)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+    <span style="font-size:12.5px;font-weight:800;color:var(--ambT)">Round 6 — settled Tue</span>
+    <span style="flex:1"></span>
+    <span style="font-size:11.5px;color:var(--mut);font-weight:700">3 transfers</span>
+  </div>
+  <div style="margin-top:10px;border:1px solid var(--hl);border-radius:16px;padding:2px 16px">
+    <div style="display:flex;align-items:center;height:44px;border-bottom:1px solid var(--hl)">
+      <span style="flex:1;font-size:13.5px;font-weight:700">Ada <span style="color:var(--mut)">→</span> Cy</span><span style="font-size:14px;font-weight:800">450</span>
+    </div>
+    <div style="display:flex;align-items:center;height:44px;border-bottom:1px solid var(--hl)">
+      <span style="flex:1;font-size:13.5px;font-weight:700">Bo <span style="color:var(--mut)">→</span> Cy</span><span style="font-size:14px;font-weight:800">250</span>
+    </div>
+    <div style="display:flex;align-items:center;height:44px;border-bottom:1px solid var(--hl)">
+      <span style="flex:1;font-size:13.5px;font-weight:700">Bo <span style="color:var(--mut)">→</span> Ada</span><span style="font-size:14px;font-weight:800">150</span>
+    </div>
+    <div style="display:flex;align-items:center;height:44px;gap:8px">
+      <span style="flex:1;font-family:ui-monospace,Menlo,monospace;font-size:11px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">TLY1.K7Q2.0006.3/3.mR4…</span>
+      <span role="button" style="font-size:12px;font-weight:800;border-bottom:1px dotted var(--sec);cursor:pointer" style-hover="color:var(--ambT)">#41,118 ↗</span>
+    </div>
+  </div>
+  <div style="height:20px"></div>
+  <div style="font-size:10.5px;font-weight:800;letter-spacing:0.14em;color:var(--mut);text-transform:uppercase">Earlier</div>
+  <div style="display:flex;align-items:center;height:50px;border-bottom:1px solid var(--hl);cursor:pointer">
+    <span style="flex:1;font-size:13.5px;font-weight:700">Round 5 <span style="color:var(--mut);font-weight:600">— settled 2 Jun</span></span>
+    <span style="font-size:11.5px;color:var(--mut);font-weight:700">2 transfers ›</span>
+  </div>
+  <div style="display:flex;align-items:center;height:50px;cursor:pointer">
+    <span style="flex:1;font-size:13.5px;font-weight:700">Round 4 <span style="color:var(--mut);font-weight:600">— settled 26 May</span></span>
+    <span style="font-size:11.5px;color:var(--mut);font-weight:700">4 transfers ›</span>
+  </div>
+  <div style="margin-top:auto;padding:12px 0 20px;display:flex;flex-direction:column;gap:9px">
+    <div role="button" style="height:48px;border:1px solid var(--hl);border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:14.5px;font-weight:800;cursor:pointer" style-hover="border-color:var(--sec)">Export signed log</div>
+  </div>
+</div>
+</div>
+</div>
+
+<div class="dv-opt" id="2k">
+<div class="dv-olabel"><a class="dv-oid" href="#2k">2k</a>Screen 10 — Reconciliation · a receipt being verified</div>
+<div class="ph">
+<div class="tka" data-screen-label="10 Reconciliation" style="width:100%;height:100%;background:var(--pg);color:var(--tx);font-family:Mulish,system-ui,sans-serif;display:flex;flex-direction:column;padding:24px 20px 0;box-sizing:border-box">
+  <div style="display:flex;align-items:center;gap:6px">
+    <div role="button" style="width:38px;height:44px;display:flex;align-items:center;cursor:pointer"><svg width="10" height="18" viewBox="0 0 10 18" fill="none"><path d="M9 1L1 9l8 8" style="stroke:var(--sec)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg></div>
+    <div style="flex:1"><div style="font-size:16px;font-weight:800">Verify</div><div style="font-size:11.5px;color:var(--mut);font-weight:700">checked against the chain, locally</div></div>
+  </div>
+  <div style="height:36px"></div>
+  <div style="text-align:center">
+    <svg width="40" height="40" viewBox="0 0 40 40" fill="none"><circle cx="20" cy="20" r="18.5" style="stroke:var(--hl)" stroke-width="1.5"></circle><path d="M12 20.5L17.5 26L28 14" style="stroke:var(--tx)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+    <div style="margin-top:14px;font-size:24px;font-weight:900">Everything matches</div>
+    <div style="margin-top:8px;font-size:12.5px;color:var(--sec);font-weight:600">6 rounds · 14 transfers · recomputed just now</div>
+  </div>
+  <div style="height:32px"></div>
+  <div style="font-size:10.5px;font-weight:800;letter-spacing:0.14em;color:var(--mut);text-transform:uppercase">The receipt</div>
+  <div style="display:flex;align-items:center;gap:12px;height:58px;border-bottom:1px solid var(--hl)">
+    <div style="flex:1"><div style="font-size:14px;font-weight:800">Signed log</div><div style="font-size:11.5px;color:var(--mut);font-weight:600">42 entries · every signature valid</div></div>
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7.5L5.5 11L12 3.5" style="stroke:var(--tx)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" opacity="0.85"></path></svg>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px;height:58px;border-bottom:1px solid var(--hl)">
+    <div style="flex:1"><div style="font-size:14px;font-weight:800">Round roots</div><div style="font-size:11.5px;color:var(--mut);font-weight:600">6 of 6 recomputed and equal</div></div>
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7.5L5.5 11L12 3.5" style="stroke:var(--tx)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" opacity="0.85"></path></svg>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px;height:58px;border-bottom:1px solid var(--hl)">
+    <div style="flex:1"><div style="font-size:14px;font-weight:800">On-chain anchors</div><div style="font-size:11.5px;color:var(--mut);font-weight:600">14 of 14 found · none missing, none orphaned</div></div>
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7.5L5.5 11L12 3.5" style="stroke:var(--tx)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" opacity="0.85"></path></svg>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px;height:58px">
+    <div style="flex:1"><div style="font-size:14px;font-weight:800">Chain head</div><div style="font-size:11.5px;color:var(--mut);font-weight:600">block #41,203 · consensus established</div></div>
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7.5L5.5 11L12 3.5" style="stroke:var(--tx)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" opacity="0.85"></path></svg>
+  </div>
+  <div style="margin-top:auto;padding:12px 0 20px;display:flex;flex-direction:column;gap:9px">
+    <div style="font-size:12px;color:var(--sec);text-align:center;font-weight:600">Anyone can run this check — it needs no trust in Tally.</div>
+    <div role="button" style="height:48px;border:1px solid var(--hl);border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:14.5px;font-weight:800;cursor:pointer" style-hover="border-color:var(--sec)">Export signed log</div>
+  </div>
+</div>
+</div>
+</div>
+
+<div class="dv-opt" id="2l">
+<div class="dv-olabel"><a class="dv-oid" href="#2l">2l</a>Screen 11 — Create a tab · name, trigger, link</div>
+<div class="ph">
+<div class="tka" data-screen-label="11 Create ledger" style="width:100%;height:100%;background:var(--pg);color:var(--tx);font-family:Mulish,system-ui,sans-serif;display:flex;flex-direction:column;padding:24px 20px 0;box-sizing:border-box">
+  <div style="display:flex;align-items:center;gap:6px">
+    <div role="button" style="width:38px;height:44px;display:flex;align-items:center;font-size:22px;color:var(--sec);cursor:pointer" style-hover="color:var(--tx)">×</div>
+    <div style="flex:1;font-size:16px;font-weight:800">New tab</div>
+  </div>
+  <div style="height:20px"></div>
+  <div style="font-size:10.5px;font-weight:800;letter-spacing:0.14em;color:var(--mut);text-transform:uppercase">Name it</div>
+  <div style="margin-top:10px;height:56px;border:1px solid var(--hl);border-radius:14px;display:flex;align-items:center;padding:0 16px;font-size:17px;font-weight:800">Lisbon, July</div>
+  <div style="height:24px"></div>
+  <div style="font-size:10.5px;font-weight:800;letter-spacing:0.14em;color:var(--mut);text-transform:uppercase">Settles</div>
+  <div style="display:flex;align-items:center;gap:12px;height:54px;border-bottom:1px solid var(--hl);cursor:pointer">
+    <div style="width:19px;height:19px;border-radius:50%;border:2px solid var(--tx);display:flex;align-items:center;justify-content:center"><div style="width:9px;height:9px;border-radius:50%;background:var(--tx)"></div></div>
+    <span style="font-size:14px;font-weight:800">On demand <span style="color:var(--mut);font-weight:600">— anyone calls the tab</span></span>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px;height:54px;border-bottom:1px solid var(--hl);cursor:pointer">
+    <div style="width:19px;height:19px;border-radius:50%;border:2px solid var(--hl)"></div>
+    <span style="font-size:14px;font-weight:700;color:var(--sec)">Weekly <span style="color:var(--mut);font-weight:600">— Sunday night</span></span>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px;height:54px;border-bottom:1px solid var(--hl);cursor:pointer">
+    <div style="width:19px;height:19px;border-radius:50%;border:2px solid var(--hl)"></div>
+    <span style="font-size:14px;font-weight:700;color:var(--sec)">Monthly <span style="color:var(--mut);font-weight:600">— the 1st</span></span>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px;height:54px;cursor:pointer">
+    <div style="width:19px;height:19px;border-radius:50%;border:2px solid var(--hl)"></div>
+    <span style="font-size:14px;font-weight:700;color:var(--sec)">Threshold <span style="color:var(--mut);font-weight:600">— a position passes 5,000</span></span>
+  </div>
+  <div style="margin-top:18px;font-size:12px;color:var(--mut);font-weight:600">2 to 12 people · everyone's a peer — no admin, no treasurer</div>
+  <div style="margin-top:auto;padding:12px 0 20px;display:flex;flex-direction:column;gap:9px">
+    <div style="font-size:12px;color:var(--sec);text-align:center;font-weight:600">Anyone with the link can look before joining.</div>
+    <div role="button" style="height:56px;border-radius:16px;background:var(--btn);color:var(--btnTx);font-size:16px;font-weight:800;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:var(--btnHov)">Create and share the link</div>
+  </div>
+</div>
+</div>
+</div>
+
+<div class="dv-opt" id="2m">
+<div class="dv-olabel"><a class="dv-oid" href="#2m">2m</a>Screen 12 — Empty state · suggests, never apologises</div>
+<div class="ph">
+<div class="tka" data-screen-label="12 Empty ledger" style="width:100%;height:100%;background:var(--pg);color:var(--tx);font-family:Mulish,system-ui,sans-serif;display:flex;flex-direction:column;padding:24px 20px 0;box-sizing:border-box">
+  <div style="display:flex;align-items:center;justify-content:space-between">
+    <div style="display:flex;align-items:center;gap:8px">
+      <svg width="15" height="15" viewBox="0 0 18 18" fill="none"><rect x="4.2" y="0.5" width="4.2" height="17" rx="1.4" style="fill:var(--tx)"></rect><rect x="9.6" y="0.5" width="4.2" height="17" rx="1.4" style="fill:var(--tx)"></rect><rect x="4.2" y="5" width="8.2" height="1.9" style="fill:var(--pg)"></rect><rect x="5.8" y="8.8" width="8" height="1.9" style="fill:var(--pg)"></rect><rect x="4.2" y="12.8" width="9.6" height="1.9" style="fill:var(--ambF)"></rect></svg>
+      <span style="font-size:15px;font-weight:800">Lisbon, July</span>
+    </div>
+    <div style="border:1px solid var(--hl);border-radius:999px;padding:0 12px;height:30px;display:flex;align-items:center;font-size:11px;font-weight:800;letter-spacing:0.08em;color:var(--sec);text-transform:uppercase">Just you</div>
+  </div>
+  <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding-bottom:40px">
+    <svg width="30" height="30" viewBox="0 0 18 18" fill="none" style="opacity:0.4"><rect x="4.2" y="0.5" width="4.2" height="17" rx="1.4" style="fill:var(--tx)"></rect><rect x="9.6" y="0.5" width="4.2" height="17" rx="1.4" style="fill:var(--tx)"></rect><rect x="4.2" y="5" width="8.2" height="1.9" style="fill:var(--pg)"></rect><rect x="5.8" y="8.8" width="8" height="1.9" style="fill:var(--pg)"></rect><rect x="4.2" y="12.8" width="9.6" height="1.9" style="fill:var(--ambF)"></rect></svg>
+    <div style="margin-top:18px;font-size:24px;font-weight:900">Nothing owed yet</div>
+    <div style="margin-top:10px;max-width:260px;font-size:13.5px;color:var(--sec);font-weight:600;line-height:1.6">Invite your people, then split something — one amount, one note, ten seconds.</div>
+  </div>
+  <div style="margin-top:auto;padding:12px 0 20px;display:flex;flex-direction:column;gap:9px">
+    <div role="button" style="height:48px;border:1px solid var(--hl);border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:14.5px;font-weight:800;cursor:pointer" style-hover="border-color:var(--sec)">Add an expense</div>
+    <div role="button" style="height:56px;border-radius:16px;background:var(--btn);color:var(--btnTx);font-size:16px;font-weight:800;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:var(--btnHov)">Share the invite link</div>
+    <div style="font-size:11.5px;color:var(--mut);text-align:center;font-weight:600">2 to 12 people · everyone's a peer</div>
+  </div>
+</div>
+</div>
+</div>
+
+</div>
+<p class="dv-next">Try next: "tighten the purse copy" · "make the settling countdown tick live" · "export the icon, animated GIF thumbnail and the five screenshots"</p>
+</section>
+
+<section class="dv-turn" id="t1">
+<div class="dv-thd"><a class="dv-tid" href="#t1">1</a><span class="dv-tname">Tally — screens 1 · 2 · 5 (revised: bare WebView, three-person cold open)</span></div>
+<div class="dv-note">Dataset is the PRD §3.2 worked example. Cold open (<a class="dv-oid" href="#1a">1a</a>) is a three-person tab — Ada −500, Bo even, Cy +500 — that the viewer joins as Dee; home (<a class="dv-oid" href="#1b">1b</a>) is after joining and after the cycle completes: Ada −1,200 · Bo −300 · Cy 0 · Dee +1,500. Amber appears only on the settled state. The collapse (<a class="dv-oid" href="#1c">1c</a>) animates on a loop.
+<span class="sw" style="background:#14100E"></span>ink <span class="sw" style="background:#1C1512"></span>surface <span class="sw" style="background:#F5F0E8"></span>bone <span class="sw" style="background:#A79E94"></span>warm grey <span class="sw" style="background:#E8940C"></span>amber (settled only) &nbsp;·&nbsp; Mulish, tabular figures, 8-pt rhythm</div>
+<div class="dv-opts">
+
+<div class="dv-opt" id="1a">
+<div class="dv-olabel"><a class="dv-oid" href="#1a">1a</a>Screen 1 — Cold open · invite link, read-only, 3 people</div>
+<div class="ph">
+<div class="tka" data-screen-label="01 Cold open" style="width:100%;height:100%;background:var(--pg);color:var(--tx);font-family:Mulish,system-ui,sans-serif;display:flex;flex-direction:column;padding:24px 20px 0;box-sizing:border-box">
+  <div style="display:flex;align-items:center;justify-content:space-between">
+    <div style="display:flex;align-items:center;gap:8px">
+      <svg width="16" height="16" viewBox="0 0 18 18" fill="none"><rect x="4.2" y="0.5" width="4.2" height="17" rx="1.4" style="fill:var(--tx)"></rect><rect x="9.6" y="0.5" width="4.2" height="17" rx="1.4" style="fill:var(--tx)"></rect><rect x="4.2" y="5" width="8.2" height="1.9" style="fill:var(--pg)"></rect><rect x="5.8" y="8.8" width="8" height="1.9" style="fill:var(--pg)"></rect><rect x="4.2" y="12.8" width="9.6" height="1.9" style="fill:var(--ambF)"></rect></svg>
+      <span style="font-size:15px;font-weight:900;letter-spacing:0.02em">Tally</span>
+    </div>
+    <div style="border:1px solid var(--hl);border-radius:999px;padding:0 12px;height:30px;display:flex;align-items:center;font-size:11px;font-weight:800;letter-spacing:0.08em;color:var(--sec);text-transform:uppercase">Read-only</div>
+  </div>
+  <div style="height:28px"></div>
+  <div style="font-size:31px;font-weight:900;letter-spacing:-0.01em;line-height:1.1">Porto, June</div>
+  <div style="margin-top:7px;font-size:13px;color:var(--sec);font-weight:600">Shared tab · 3 people · settles on demand</div>
+  <div style="height:24px"></div>
+  <div style="font-size:10.5px;font-weight:800;letter-spacing:0.14em;color:var(--mut);text-transform:uppercase">Positions</div>
+  <div style="display:flex;align-items:center;gap:12px;height:57px;border-bottom:1px solid var(--hl)">
+    <div style="width:34px;height:34px;border-radius:50%;background:var(--card);border:1px solid var(--hl);display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:800;color:var(--sec)">A</div>
+    <div style="flex:1;min-width:0"><div style="font-size:15px;font-weight:800">Ada</div><div style="font-size:11.5px;color:var(--mut);font-weight:600">owes the tab</div></div>
+    <div><span style="font-size:17px;font-weight:800">−500</span><span style="font-size:11px;font-weight:700;color:var(--mut);margin-left:4px">NIM</span></div>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px;height:57px;border-bottom:1px solid var(--hl)">
+    <div style="width:34px;height:34px;border-radius:50%;background:var(--card);border:1px solid var(--hl);display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:800;color:var(--sec)">B</div>
+    <div style="flex:1;min-width:0"><div style="font-size:15px;font-weight:800">Bo</div><div style="font-size:11.5px;color:var(--mut);font-weight:600">even — owes and is owed 500</div></div>
+    <div><span style="font-size:17px;font-weight:800;color:var(--mut)">0</span><span style="font-size:11px;font-weight:700;color:var(--mut);margin-left:4px">NIM</span></div>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px;height:57px;border-bottom:1px solid var(--hl)">
+    <div style="width:34px;height:34px;border-radius:50%;background:var(--card);border:1px solid var(--hl);display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:800;color:var(--sec)">C</div>
+    <div style="flex:1;min-width:0"><div style="font-size:15px;font-weight:800">Cy</div><div style="font-size:11.5px;color:var(--mut);font-weight:600">is owed</div></div>
+    <div><span style="font-size:17px;font-weight:800">+500</span><span style="font-size:11px;font-weight:700;color:var(--mut);margin-left:4px">NIM</span></div>
+  </div>
+  <div style="height:22px"></div>
+  <div style="font-size:10.5px;font-weight:800;letter-spacing:0.14em;color:var(--mut);text-transform:uppercase">Activity</div>
+  <div style="display:flex;align-items:center;gap:10px;height:50px;border-bottom:1px solid var(--hl)">
+    <div style="flex:1;font-size:13.5px;color:var(--sec);font-weight:600;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Ada added <span style="color:var(--tx);font-weight:800">Wine night</span> — awaiting Cy</div>
+    <span style="font-size:14px;font-weight:800;color:var(--mut)">500</span><span style="font-size:11.5px;color:var(--mut);font-weight:600">2h</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px;height:50px;border-bottom:1px solid var(--hl)">
+    <div style="flex:1;font-size:13.5px;color:var(--sec);font-weight:600;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Bo accepted <span style="color:var(--tx);font-weight:800">Market run</span></div>
+    <span style="font-size:14px;font-weight:800">500</span><span style="font-size:11.5px;color:var(--mut);font-weight:600">1d</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px;height:50px">
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7.5L5.5 11L12 3.5" style="stroke:var(--ambT)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+    <div style="flex:1;font-size:13.5px;font-weight:600;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><span style="color:var(--ambT);font-weight:800">Round 6 settled</span><span style="color:var(--mut)"> — 3 transfers · anchored</span></div>
+    <span style="font-size:11.5px;color:var(--mut);font-weight:600">Tue</span>
+  </div>
+  <div style="margin-top:auto;padding:14px 0 20px;display:flex;flex-direction:column;gap:11px">
+    <div style="font-size:12.5px;color:var(--sec);text-align:center;font-weight:600">A live shared tab — browse freely, no wallet needed.</div>
+    <div role="button" style="height:56px;border-radius:16px;background:var(--btn);color:var(--btnTx);font-size:16px;font-weight:800;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:var(--btnHov)">Join this tab</div>
+    <div style="font-size:11.5px;color:var(--mut);text-align:center;font-weight:600">One approval · under a minute · free</div>
+  </div>
+</div>
+</div>
+</div>
+
+<div class="dv-opt" id="1b">
+<div class="dv-olabel"><a class="dv-oid" href="#1b">1b</a>Screen 2 — Ledger home · viewer joined as Dee</div>
+<div class="ph">
+<div class="tka" data-screen-label="02 Ledger home" style="width:100%;height:100%;background:var(--pg);color:var(--tx);font-family:Mulish,system-ui,sans-serif;display:flex;flex-direction:column;padding:24px 20px 0;box-sizing:border-box">
+  <div style="display:flex;align-items:center;justify-content:space-between">
+    <div style="display:flex;align-items:center;gap:8px">
+      <svg width="15" height="15" viewBox="0 0 18 18" fill="none"><rect x="4.2" y="0.5" width="4.2" height="17" rx="1.4" style="fill:var(--tx)"></rect><rect x="9.6" y="0.5" width="4.2" height="17" rx="1.4" style="fill:var(--tx)"></rect><rect x="4.2" y="5" width="8.2" height="1.9" style="fill:var(--pg)"></rect><rect x="5.8" y="8.8" width="8" height="1.9" style="fill:var(--pg)"></rect><rect x="4.2" y="12.8" width="9.6" height="1.9" style="fill:var(--ambF)"></rect></svg>
+      <span style="font-size:15px;font-weight:800">Porto, June</span>
+    </div>
+    <sc-if value="{{ showPurse }}" hint-placeholder-val="{{ true }}">
+    <div style="display:flex;align-items:center;gap:6px;border:1px solid var(--hl);border-radius:999px;padding:0 12px;height:30px;font-size:12px;font-weight:700;color:var(--sec)">Purse<span style="color:var(--tx);font-weight:800">2,000</span></div>
+    </sc-if>
+  </div>
+  <div style="height:30px"></div>
+  <div style="text-align:center">
+    <div style="font-size:10.5px;font-weight:800;letter-spacing:0.14em;color:var(--mut);text-transform:uppercase">Your position</div>
+    <div style="margin-top:12px;font-size:66px;font-weight:900;letter-spacing:-0.02em;line-height:1"><span style="color:var(--mut);font-weight:700">+</span>1,500<span style="font-size:17px;font-weight:700;color:var(--mut);margin-left:9px">NIM</span></div>
+    <div style="margin-top:13px;font-size:15px;color:var(--sec);font-weight:600">You're owed 1,500 NIM</div>
+    <div style="margin-top:20px;display:flex;justify-content:center">
+      <div role="button" style="height:44px;border:1px solid var(--hl);border-radius:999px;padding:0 20px;display:flex;align-items:center;gap:8px;font-size:13px;font-weight:800;cursor:pointer" style-hover="border-color:var(--sec)">Preview settlement<span style="color:var(--mut)">→</span></div>
+    </div>
+  </div>
+  <div style="height:26px"></div>
+  <div style="font-size:10.5px;font-weight:800;letter-spacing:0.14em;color:var(--mut);text-transform:uppercase">People</div>
+  <div style="display:flex;align-items:center;gap:12px;height:56px;border-bottom:1px solid var(--hl)">
+    <div style="width:34px;height:34px;border-radius:50%;background:var(--card);border:1px solid var(--hl);display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:800;color:var(--sec)">A</div>
+    <div style="flex:1;min-width:0"><div style="font-size:15px;font-weight:800">Ada</div><div style="font-size:11.5px;color:var(--mut);font-weight:600">owes the tab</div></div>
+    <div><span style="font-size:17px;font-weight:800">−1,200</span><span style="font-size:11px;font-weight:700;color:var(--mut);margin-left:4px">NIM</span></div>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px;height:56px;border-bottom:1px solid var(--hl)">
+    <div style="width:34px;height:34px;border-radius:50%;background:var(--card);border:1px solid var(--hl);display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:800;color:var(--sec)">B</div>
+    <div style="flex:1;min-width:0"><div style="font-size:15px;font-weight:800">Bo</div><div style="font-size:11.5px;color:var(--mut);font-weight:600">owes the tab</div></div>
+    <div><span style="font-size:17px;font-weight:800">−300</span><span style="font-size:11px;font-weight:700;color:var(--mut);margin-left:4px">NIM</span></div>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px;height:56px;border-bottom:1px solid var(--hl)">
+    <div style="width:34px;height:34px;border-radius:50%;background:var(--card);border:1px solid var(--hl);display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:800;color:var(--sec)">C</div>
+    <div style="flex:1;min-width:0"><div style="font-size:15px;font-weight:800">Cy</div><div style="font-size:11.5px;color:var(--mut);font-weight:600">even — drops out of the round</div></div>
+    <div><span style="font-size:17px;font-weight:800;color:var(--mut)">0</span><span style="font-size:11px;font-weight:700;color:var(--mut);margin-left:4px">NIM</span></div>
+  </div>
+  <div style="height:18px"></div>
+  <div style="font-size:10.5px;font-weight:800;letter-spacing:0.14em;color:var(--mut);text-transform:uppercase">Activity</div>
+  <div style="display:flex;align-items:center;gap:10px;height:49px;border-bottom:1px solid var(--hl)">
+    <div style="flex:1;font-size:13.5px;color:var(--sec);font-weight:600;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Cy accepted <span style="color:var(--tx);font-weight:800">Wine night</span></div>
+    <span style="font-size:14px;font-weight:800">500</span><span style="font-size:11.5px;color:var(--mut);font-weight:600">2h</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px;height:49px;border-bottom:1px solid var(--hl)">
+    <div style="flex:1;font-size:13.5px;color:var(--sec);font-weight:600;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Bo accepted <span style="color:var(--tx);font-weight:800">Fuel</span></div>
+    <span style="font-size:14px;font-weight:800">300</span><span style="font-size:11.5px;color:var(--mut);font-weight:600">4h</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px;height:49px">
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7.5L5.5 11L12 3.5" style="stroke:var(--ambT)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+    <div style="flex:1;font-size:13.5px;font-weight:600;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><span style="color:var(--ambT);font-weight:800">Round 6 settled</span><span style="color:var(--mut)"> — 3 transfers · anchored</span></div>
+    <span style="font-size:11.5px;color:var(--mut);font-weight:600">Tue</span>
+  </div>
+  <div style="margin-top:auto;padding:12px 0 20px">
+    <div role="button" style="height:56px;border-radius:16px;background:var(--btn);color:var(--btnTx);font-size:16px;font-weight:800;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:var(--btnHov)">Add expense</div>
+  </div>
+</div>
+</div>
+</div>
+
+<div class="dv-opt" id="1c">
+<div class="dv-olabel"><a class="dv-oid" href="#1c">1c</a>Screen 5 — Settlement preview · the collapse (animates, loops)</div>
+<div class="ph">
+<div class="tka" data-screen-label="05 Settlement preview" style="width:100%;height:100%;background:var(--pg);color:var(--tx);font-family:Mulish,system-ui,sans-serif;display:flex;flex-direction:column;padding:24px 20px 0;box-sizing:border-box">
+  <div style="display:flex;align-items:center;gap:6px">
+    <div role="button" style="width:38px;height:44px;display:flex;align-items:center;cursor:pointer"><svg width="10" height="18" viewBox="0 0 10 18" fill="none"><path d="M9 1L1 9l8 8" style="stroke:var(--sec)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg></div>
+    <div style="flex:1"><div style="font-size:16px;font-weight:800">Settle up</div><div style="font-size:11.5px;color:var(--mut);font-weight:700">Round 7 · preview</div></div>
+    <sc-if value="{{ showPurse }}" hint-placeholder-val="{{ true }}">
+    <div style="display:flex;align-items:center;gap:6px;border:1px solid var(--hl);border-radius:999px;padding:0 12px;height:30px;font-size:12px;font-weight:700;color:var(--sec)">Purse<span style="color:var(--tx);font-weight:800">2,000</span></div>
+    </sc-if>
+  </div>
+  <div style="height:14px"></div>
+  <div style="font-size:10.5px;font-weight:800;letter-spacing:0.14em;color:var(--mut);text-transform:uppercase">Five debts, two transfers</div>
+  <div style="height:244px;margin-top:4px">
+    <svg viewBox="0 0 350 262" width="100%" height="100%" style="display:block">
+      <defs><marker id="tArr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="context-stroke"></path></marker></defs>
+      <g style="opacity:0.55;animation:tlyCyc 8.6s linear infinite"><path d="M 92 54 Q 175 36 258 54" fill="none" stroke-width="1.6" stroke-linecap="round" marker-end="url(#tArr)" style="stroke:var(--tx);animation:tlyCycW 8.6s linear infinite"></path><text x="175" y="30" text-anchor="middle" font-size="11.5" font-weight="800" stroke-width="4" style="fill:var(--tx);stroke:var(--pg);paint-order:stroke">500</text></g>
+      <g style="opacity:0.55;animation:tlyCyc 8.6s linear infinite"><path d="M 288 92 Q 303 129 288 166" fill="none" stroke-width="1.6" stroke-linecap="round" marker-end="url(#tArr)" style="stroke:var(--tx);animation:tlyCycW 8.6s linear infinite"></path><text x="322" y="133" text-anchor="middle" font-size="11.5" font-weight="800" stroke-width="4" style="fill:var(--tx);stroke:var(--pg);paint-order:stroke">500</text></g>
+      <g style="opacity:0.55;animation:tlyCyc 8.6s linear infinite"><path d="M 258 182 Q 175 129 92 76" fill="none" stroke-width="1.6" stroke-linecap="round" marker-end="url(#tArr)" style="stroke:var(--tx);animation:tlyCycW 8.6s linear infinite"></path><text x="229" y="170" text-anchor="middle" font-size="11.5" font-weight="800" stroke-width="4" style="fill:var(--tx);stroke:var(--pg);paint-order:stroke">500</text></g>
+      <g style="opacity:0.55;animation:tlyFin 8.6s linear infinite"><path d="M 62 92 Q 46 129 62 166" fill="none" stroke-width="1.6" stroke-linecap="round" marker-end="url(#tArr)" style="stroke:var(--tx);animation:tlyFinW 8.6s linear infinite"></path><text x="32" y="133" text-anchor="middle" font-size="11.5" font-weight="800" stroke-width="4" style="fill:var(--tx);stroke:var(--pg);paint-order:stroke">1,200</text></g>
+      <g style="opacity:0.55;animation:tlyFin 8.6s linear infinite"><path d="M 256 78 Q 175 129 94 180" fill="none" stroke-width="1.6" stroke-linecap="round" marker-end="url(#tArr)" style="stroke:var(--tx);animation:tlyFinW 8.6s linear infinite"></path><text x="118" y="162" text-anchor="middle" font-size="11.5" font-weight="800" stroke-width="4" style="fill:var(--tx);stroke:var(--pg);paint-order:stroke">300</text></g>
+      <g><circle cx="66" cy="62" r="24" stroke-width="1" style="fill:var(--card);stroke:var(--hl)"></circle><text x="66" y="66" text-anchor="middle" font-size="11.5" font-weight="800" style="fill:var(--tx)">Ada</text></g>
+      <g><circle cx="284" cy="62" r="24" stroke-width="1" style="fill:var(--card);stroke:var(--hl)"></circle><text x="284" y="66" text-anchor="middle" font-size="11.5" font-weight="800" style="fill:var(--tx)">Bo</text></g>
+      <g style="animation:var(--ghostA)"><circle cx="284" cy="196" r="24" stroke-width="1" style="fill:var(--card);stroke:var(--hl)"></circle><text x="284" y="200" text-anchor="middle" font-size="11.5" font-weight="800" style="fill:var(--tx)">Cy</text></g>
+      <g><circle cx="66" cy="196" r="24" stroke-width="1" style="fill:var(--card);stroke:var(--hl)"></circle><text x="66" y="200" text-anchor="middle" font-size="11.5" font-weight="800" style="fill:var(--tx)">Dee</text><text x="66" y="238" text-anchor="middle" font-size="9" font-weight="800" letter-spacing="1.5" style="fill:var(--mut)">YOU</text></g>
+      <g style="opacity:0;animation:tlyChip 8.6s linear infinite"><rect x="236" y="228" width="96" height="21" rx="10.5" fill="none" style="stroke:var(--hl)"></rect><text x="284" y="242" text-anchor="middle" font-size="9" font-weight="800" letter-spacing="0.8" style="fill:var(--sec)">NETS TO ZERO</text></g>
+    </svg>
+  </div>
+  <div style="margin-top:6px;text-align:center;font-size:13px;font-weight:600;color:var(--sec);opacity:0;animation:tlyChip 8.6s linear infinite">Cy nets to zero — sits this round out</div>
+  <div style="margin-top:8px;text-align:center;font-size:13px;font-weight:700;color:var(--mut)">5 obligations → <span style="color:var(--tx);font-weight:900">2 transfers</span> · 1,500 NIM moves</div>
+  <div style="height:18px"></div>
+  <div style="font-size:10.5px;font-weight:800;letter-spacing:0.14em;color:var(--mut);text-transform:uppercase">Transfers</div>
+  <div style="display:flex;align-items:center;gap:12px;height:56px;border-bottom:1px solid var(--hl)">
+    <div style="flex:1;min-width:0"><div style="font-size:15px;font-weight:800">Ada <span style="color:var(--mut);font-weight:700">→</span> Dee</div><div style="font-size:11.5px;color:var(--mut);font-weight:600">sends when Ada opens Tally</div></div>
+    <div><span style="font-size:18px;font-weight:900">1,200</span><span style="font-size:11px;font-weight:700;color:var(--mut);margin-left:4px">NIM</span></div>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px;height:56px">
+    <div style="flex:1;min-width:0"><div style="font-size:15px;font-weight:800">Bo <span style="color:var(--mut);font-weight:700">→</span> Dee</div><div style="font-size:11.5px;color:var(--mut);font-weight:600">sends when Bo opens Tally</div></div>
+    <div><span style="font-size:18px;font-weight:900">300</span><span style="font-size:11px;font-weight:700;color:var(--mut);margin-left:4px">NIM</span></div>
+  </div>
+  <div style="margin-top:auto;padding:12px 0 20px;display:flex;flex-direction:column;gap:10px">
+    <div role="button" style="height:56px;border-radius:16px;background:var(--btn);color:var(--btnTx);font-size:16px;font-weight:800;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:var(--btnHov)">Call the tab</div>
+    <div style="font-size:11.5px;color:var(--mut);text-align:center;font-weight:600">Each leg sends itself — settled at finality, about a minute</div>
+  </div>
+</div>
+</div>
+</div>
+
+</div>
+<p class="dv-next">Try next: "wire the three into one tappable flow" · "riff on the collapse animation" · "go on to screens 3, 4 and 6–13"</p>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1480,&quot;height&quot;:1080},&quot;showPurse&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Chrome&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    return { showPurse: this.props.showPurse ?? true };
+  }
+}
+</script>
+</body>
+</html>

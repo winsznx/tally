@@ -1,0 +1,97 @@
+<div id="app-banner" hidden style="background:#1C1512;color:#EDE4D6;font-size:12.5px;font-weight:700;padding:10px 40px;display:flex;gap:8px;align-items:center"><span style="width:7px;height:7px;border-radius:50%;background:#E8940C"></span>window.nimiqPay detected — the mini app mounts here instead of this page.</div>
+
+<div style="border-bottom:1px solid #E3DED7">
+  <div style="max-width:1200px;margin:0 auto;padding:0 40px;height:72px;display:flex;align-items:center;gap:28px">
+    <div style="display:flex;align-items:center;gap:10px;margin-right:auto">
+      <div style="width:30px;height:30px;border-radius:7px;background:#1C1512;display:flex;align-items:center;justify-content:center"><svg width="16" height="16" viewBox="0 0 18 18" fill="none"><rect x="4.2" y="0.5" width="4.2" height="17" rx="1.4" fill="#F7F2E9"></rect><rect x="9.6" y="0.5" width="4.2" height="17" rx="1.4" fill="#F7F2E9"></rect><rect x="4.2" y="5" width="8.2" height="1.9" fill="#1C1512"></rect><rect x="5.8" y="8.8" width="8" height="1.9" fill="#1C1512"></rect><rect x="4.2" y="12.8" width="9.6" height="1.9" fill="#E8940C"></rect></svg></div>
+      <span style="font-size:16px;font-weight:800;letter-spacing:0.01em">Tally</span>
+    </div>
+    <a href="#netting" style="font-size:14px;font-weight:600;color:#55504C;text-decoration:none">How it works</a>
+    <a href="https://github.com/winsznx/tally" style="font-size:14px;font-weight:600;color:#55504C;text-decoration:none">GitHub</a>
+    <a href="#try" role="button" style="height:40px;padding:0 18px;border-radius:4px;background:#E8940C;color:#1C1512;font-size:14px;font-weight:800;display:flex;align-items:center;text-decoration:none">Try it on testnet</a>
+  </div>
+</div>
+
+<div style="background:#FFFFFF">
+  <div style="max-width:1200px;margin:0 auto;padding:88px 40px 96px;display:grid;grid-template-columns:1.1fr 0.9fr;gap:64px;align-items:center" class="hero-grid">
+    <div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:500;letter-spacing:0.02em;text-transform:uppercase;color:#8A8279">Nimiq Pay Mini App</div>
+      <h1 style="margin:18px 0 0;font-family:'Instrument Serif',serif;font-weight:400;font-size:64px;line-height:1.04;letter-spacing:-0.04em">Top up once.<br>Stop settling up.</h1>
+      <p style="margin:22px 0 0;max-width:480px;font-size:18px;line-height:1.65;color:#55504C;font-weight:500">A shared tab for any group that spends together. Tally nets everyone's debts down to the fewest transfers and clears them in NIM without a payment prompt.</p>
+      <div style="margin-top:36px;display:flex;gap:20px;align-items:center;flex-wrap:wrap">
+        <div style="background:#FFFFFF;border:1px solid #E3DED7;border-radius:4px;padding:14px;display:flex;gap:14px;align-items:center;box-shadow:0 8px 24px rgba(28,21,18,0.12)">
+          <div id="hero-qr" style="width:104px;height:104px"></div>
+          <div>
+            <div style="font-size:14px;font-weight:800">Scan with Nimiq Pay</div>
+            <div style="margin-top:4px;font-size:11.5px;color:#8A8279;font-weight:600">Free · testnet · 60 seconds</div>
+            <div id="hero-deeplink" style="margin-top:8px;font-family:'JetBrains Mono',monospace;font-size:10px;color:#8A8279">nimiqpay://miniapp?url=…</div>
+          </div>
+        </div>
+        <a href="#try" role="button" style="height:48px;padding:0 22px;border-radius:4px;border:1px solid #E3DED7;color:#1C1512;font-size:15px;font-weight:700;display:flex;align-items:center;gap:8px;cursor:pointer;text-decoration:none"><span style="font-size:11px">▶</span>Watch the demo — 60s</a>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:center">
+      <div style="width:330px;background:#1C1512;border-radius:36px;padding:12px">
+        <div style="background:#17120E;border-radius:26px;border:1px solid rgba(237,228,214,0.1);color:#EDE4D6;padding:22px 16px 16px;overflow:hidden">
+          <div style="display:flex;align-items:baseline;justify-content:space-between"><span style="font-size:14px;font-weight:800">Settle up</span><span style="font-size:10.5px;color:#6E655A;font-weight:700">Round 7 · preview</span></div>
+          <div style="margin-top:14px">
+            <svg viewBox="0 0 350 262" width="100%" style="display:block">
+              <defs><marker id="hArr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#EDE4D6"></path></marker></defs>
+              <g style="opacity:0.55;animation:tlyCyc 8.6s linear infinite"><path d="M 92 54 Q 175 36 258 54" fill="none" stroke="#EDE4D6" stroke-width="1.6" stroke-linecap="round" marker-end="url(#hArr)" style="animation:tlyCycW 8.6s linear infinite"></path><text x="175" y="30" text-anchor="middle" fill="#EDE4D6" font-size="11.5" font-weight="800" stroke="#17120E" stroke-width="4" style="paint-order:stroke">500</text></g>
+              <g style="opacity:0.55;animation:tlyCyc 8.6s linear infinite"><path d="M 288 92 Q 303 129 288 166" fill="none" stroke="#EDE4D6" stroke-width="1.6" stroke-linecap="round" marker-end="url(#hArr)" style="animation:tlyCycW 8.6s linear infinite"></path><text x="322" y="133" text-anchor="middle" fill="#EDE4D6" font-size="11.5" font-weight="800" stroke="#17120E" stroke-width="4" style="paint-order:stroke">500</text></g>
+              <g style="opacity:0.55;animation:tlyCyc 8.6s linear infinite"><path d="M 258 182 Q 175 129 92 76" fill="none" stroke="#EDE4D6" stroke-width="1.6" stroke-linecap="round" marker-end="url(#hArr)" style="animation:tlyCycW 8.6s linear infinite"></path><text x="229" y="170" text-anchor="middle" fill="#EDE4D6" font-size="11.5" font-weight="800" stroke="#17120E" stroke-width="4" style="paint-order:stroke">500</text></g>
+              <g style="opacity:0.55;animation:tlyFin 8.6s linear infinite"><path d="M 62 92 Q 46 129 62 166" fill="none" stroke="#EDE4D6" stroke-width="1.6" stroke-linecap="round" marker-end="url(#hArr)" style="animation:tlyFinW 8.6s linear infinite"></path><text x="32" y="133" text-anchor="middle" fill="#EDE4D6" font-size="11.5" font-weight="800" stroke="#17120E" stroke-width="4" style="paint-order:stroke">1,200</text></g>
+              <g style="opacity:0.55;animation:tlyFin 8.6s linear infinite"><path d="M 256 78 Q 175 129 94 180" fill="none" stroke="#EDE4D6" stroke-width="1.6" stroke-linecap="round" marker-end="url(#hArr)" style="animation:tlyFinW 8.6s linear infinite"></path><text x="118" y="162" text-anchor="middle" fill="#EDE4D6" font-size="11.5" font-weight="800" stroke="#17120E" stroke-width="4" style="paint-order:stroke">300</text></g>
+              <g><circle cx="66" cy="62" r="24" fill="#221B14" stroke="rgba(235,226,214,0.16)" stroke-width="1"></circle><text x="66" y="66" text-anchor="middle" fill="#EDE4D6" font-size="11.5" font-weight="800">Ada</text></g>
+              <g><circle cx="284" cy="62" r="24" fill="#221B14" stroke="rgba(235,226,214,0.16)" stroke-width="1"></circle><text x="284" y="66" text-anchor="middle" fill="#EDE4D6" font-size="11.5" font-weight="800">Bo</text></g>
+              <g style="animation:tlyGhost 8.6s linear infinite"><circle cx="284" cy="196" r="24" fill="#221B14" stroke="rgba(235,226,214,0.16)" stroke-width="1"></circle><text x="284" y="200" text-anchor="middle" fill="#EDE4D6" font-size="11.5" font-weight="800">Cy</text></g>
+              <g><circle cx="66" cy="196" r="24" fill="#221B14" stroke="rgba(235,226,214,0.16)" stroke-width="1"></circle><text x="66" y="200" text-anchor="middle" fill="#EDE4D6" font-size="11.5" font-weight="800">Dee</text><text x="66" y="238" text-anchor="middle" fill="#6E655A" font-size="9" font-weight="800" letter-spacing="1.5">YOU</text></g>
+              <g style="opacity:0;animation:tlyChip 8.6s linear infinite"><rect x="236" y="228" width="96" height="21" rx="10.5" fill="none" stroke="rgba(235,226,214,0.16)"></rect><text x="284" y="242" text-anchor="middle" fill="#A79B8C" font-size="9" font-weight="800" letter-spacing="0.8">NETS TO ZERO</text></g>
+            </svg>
+          </div>
+          <div style="margin-top:4px;text-align:center;font-size:11.5px;font-weight:700;color:#6E655A">5 obligations → <span style="color:#EDE4D6;font-weight:900">2 transfers</span> · 1,500 NIM moves</div>
+          <div style="margin-top:12px;display:flex;align-items:center;height:44px;border-top:1px solid rgba(235,226,214,0.08)"><span style="flex:1;font-size:13px;font-weight:800">Ada <span style="color:#6E655A">→</span> Dee</span><span style="font-size:14px;font-weight:900">1,200</span></div>
+          <div style="display:flex;align-items:center;height:44px;border-top:1px solid rgba(235,226,214,0.08)"><span style="flex:1;font-size:13px;font-weight:800">Bo <span style="color:#6E655A">→</span> Dee</span><span style="font-size:14px;font-weight:900">300</span></div>
+          <div style="margin-top:10px;height:46px;border-radius:12px;background:#EDE4D6;color:#1A140F;font-size:14px;font-weight:800;display:flex;align-items:center;justify-content:center">Call the tab</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="netting" style="background:#F7F5F2">
+  <div style="max-width:1200px;margin:0 auto;padding:92px 40px;max-width:820px">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:500;text-transform:uppercase;color:#8A8279">Netting</div>
+    <h2 style="margin:16px 0 0;font-family:'Instrument Serif',serif;font-weight:400;font-size:44px;line-height:1.12;letter-spacing:-0.03em">Five debts become two transfers.</h2>
+    <p style="margin:22px 0 0;font-size:16.5px;line-height:1.7;color:#55504C;font-weight:500">Tally collapses pairwise debts, cancels cycles exactly, then matches the largest debtor to the largest creditor — at most n−1 transfers for n people, computed the same way on every device. And whoever nets to zero drops out of the round entirely: they never send, never receive, never even open the app.</p>
+  </div>
+</div>
+
+<div style="background:#FFFFFF">
+  <div style="max-width:820px;margin:0 auto;padding:92px 40px">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:500;text-transform:uppercase;color:#8A8279">The purse</div>
+    <h2 style="margin:16px 0 0;font-family:'Instrument Serif',serif;font-weight:400;font-size:44px;line-height:1.12;letter-spacing:-0.03em">Approve once. Never again.</h2>
+    <p style="margin:22px 0 0;font-size:16.5px;line-height:1.7;color:#55504C;font-weight:500">One signature derives a small spending key — the purse — that pays your settlements while Tally is open. Your wallet key is used exactly twice, ever. It is a cash drawer, not a vault: whatever the purse holds is all that can ever be lost, withdraw-all is one tap from every screen, and skipping it is fine forever — you just approve each payment yourself.</p>
+  </div>
+</div>
+
+<div id="try" style="background:#F7F5F2">
+  <div style="max-width:1200px;margin:0 auto;padding:92px 40px">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:500;text-transform:uppercase;color:#8A8279">Testnet</div>
+    <h2 style="margin:16px 0 0;font-family:'Instrument Serif',serif;font-weight:400;font-size:44px;line-height:1.12;letter-spacing:-0.03em">Zero to settled in sixty seconds.</h2>
+    <div style="margin-top:40px;display:flex;gap:32px;align-items:center;flex-wrap:wrap">
+      <div style="flex:1;min-width:180px"><div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#8A8279">01</div><div style="margin-top:10px;font-size:16px;font-weight:800">Install Nimiq Pay</div><div style="margin-top:6px;font-size:14px;line-height:1.6;color:#55504C;font-weight:500">iOS and Android. Takes a minute, no sign-up.</div></div>
+      <div style="flex:1;min-width:180px"><div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#8A8279">02</div><div style="margin-top:10px;font-size:16px;font-weight:800">Get free testnet NIM</div><div style="margin-top:6px;font-size:14px;line-height:1.6;color:#55504C;font-weight:500">From the faucet inside the wallet. Not real money — that's the point.</div></div>
+      <div style="flex:1;min-width:180px"><div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#8A8279">03</div><div style="margin-top:10px;font-size:16px;font-weight:800">Open Tally</div><div style="margin-top:6px;font-size:14px;line-height:1.6;color:#55504C;font-weight:500">Look around a live tab before joining. No wallet interaction needed to browse.</div></div>
+      <div style="background:#FFFFFF;border:1px solid #E3DED7;border-radius:4px;padding:14px;display:flex;gap:14px;align-items:center"><div id="try-qr" style="width:96px;height:96px"></div><div><div style="font-size:13.5px;font-weight:800">Scan with Nimiq Pay</div><div style="margin-top:4px;font-size:11px;color:#8A8279;font-weight:600">Opens Tally on testnet</div></div></div>
+    </div>
+  </div>
+</div>
+
+<div style="background:#F7F5F2;border-top:1px solid #E3DED7">
+  <div style="max-width:1200px;margin:0 auto;padding:36px 40px;display:flex;align-items:center;gap:24px;flex-wrap:wrap">
+    <span style="font-size:13px;color:#8A8279;font-weight:600;margin-right:auto">Built for the Nimiq Pay Mini Apps Competition, Cycle II</span>
+    <a href="https://github.com/winsznx/tally" style="font-size:13px;font-weight:700;color:#55504C;text-decoration:none">GitHub ↗</a>
+    <span style="font-size:13px;color:#8A8279;font-weight:600">MIT licence</span>
+  </div>
+</div>
