@@ -5,6 +5,7 @@ import {
   countdown,
   nim,
   renderDegraded,
+  renderEntry,
   renderHome,
   renderReconciliation,
   renderRound,
@@ -204,9 +205,10 @@ describe('home', () => {
 });
 
 describe('the account strip surfaces the next real action', () => {
+  // Two members: "add expense" is only correct once there is somebody to owe.
   const base: LedgerViewModel = {
     name: 'Trip', genesisHash: 'ff'.repeat(32),
-    members: [{ address: ADA, position: -120_000_000n }],
+    members: [{ address: ADA, position: -120_000_000n }, { address: DEE, position: 120_000_000n }],
     myPosition: -120_000_000n, requestsForMe: [], awaitingOthers: [],
     preview: null, openRound: null, myAddressForSettle: ADA, ignoredCount: 0,
   };
@@ -264,5 +266,80 @@ describe('the account strip surfaces the next real action', () => {
 
   it('shows a busy label while an action is in flight', () => {
     expect(renderHome(base, names, t, null, homeOpts({ busy: 'Settling' }))).toContain('Settling');
+  });
+});
+
+describe('the bare origin gets a real entry screen', () => {
+  it('leads with the live example, not an empty tab', () => {
+    const html = renderEntry([], t);
+    expect(html).toContain('data-action="example"');
+    expect(html).toContain('See a live example');
+    expect(html).toContain('data-action="start-tab"');
+    // the example is primary, start-tab secondary
+    expect(html.indexOf('data-action="example"')).toBeLessThan(html.indexOf('data-action="start-tab"'));
+    expect(html).toContain('Nothing touches your wallet');
+    // never the empty-solo contradiction
+    expect(html).not.toContain('Nothing to settle yet');
+    expect(html).not.toContain('data-action="join"');
+  });
+
+  it('lists tabs I am already in above both actions', () => {
+    const html = renderEntry([{ ledgerId: 'abc', name: 'Lisbon trip' }], t);
+    expect(html).toContain('Lisbon trip');
+    expect(html).toContain('data-action="open-tab"');
+    expect(html.indexOf('Lisbon trip')).toBeLessThan(html.indexOf('data-action="example"'));
+  });
+});
+
+describe('the solo tab tells you to invite, not to add an expense', () => {
+  const solo: LedgerViewModel = {
+    name: 'New tab', genesisHash: 'ff'.repeat(32),
+    members: [{ address: ADA, position: 0n }],
+    myPosition: 0n, requestsForMe: [], awaitingOthers: [],
+    preview: null, openRound: null, myAddressForSettle: ADA, ignoredCount: 0,
+  };
+
+  it('makes sharing the invite the primary action when I am alone', () => {
+    const html = renderHome(solo, names, t, null, homeOpts({ membership: 'active' }));
+    expect(html).toContain('A tab needs at least two people');
+    expect(html).toContain('Share the invite link');
+    // "add an expense" is wrong with nobody to owe
+    expect(html).not.toContain('data-action="add"');
+    expect(html).not.toContain('Nothing to settle yet');
+  });
+
+  it('offers add expense once somebody else is in the tab', () => {
+    const withBo: LedgerViewModel = { ...solo, members: [...solo.members, { address: BO, position: 0n }] };
+    const html = renderHome(withBo, names, t, null, homeOpts({ membership: 'active' }));
+    expect(html).toContain('data-action="add"');
+    expect(html).toContain('Add the first expense');
+    expect(html).not.toContain('A tab needs at least two people');
+  });
+
+  it('never shows a read-only notice and an add prompt at the same time', () => {
+    const html = renderHome(solo, names, t, null, homeOpts({ membership: 'not-a-member' }));
+    expect(html).toContain('read-only');
+    expect(html).not.toContain('Add the first expense');
+    expect(html).not.toContain('A tab needs at least two people');
+  });
+});
+
+describe('an onlooker sees the tab, not a fake personal position', () => {
+  it('never claims "settled up" to somebody with no position in the tab', () => {
+    const vm: LedgerViewModel = {
+      name: 'Lisbon trip (live example)', genesisHash: 'ff'.repeat(32),
+      members: [
+        { address: ADA, position: -120_000_000n },
+        { address: BO, position: -30_000_000n },
+        { address: DEE, position: 150_000_000n },
+      ],
+      myPosition: null, requestsForMe: [], awaitingOthers: [],
+      preview: null, openRound: null, myAddressForSettle: null, ignoredCount: 0,
+    };
+    const html = renderHome(vm, names, t, null, homeOpts({ membership: 'not-a-member' }));
+    expect(html).not.toContain('Settled up');
+    expect(html).toContain('3 people');
+    expect(html).toContain('1,500'); // total outstanding
+    expect(html).toContain('read-only');
   });
 });

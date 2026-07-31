@@ -25,8 +25,9 @@ import { LocalThemeStore, applyTheme, resolveTheme, toggleTheme, type Theme } fr
 import type { LedgerViewModel, ObservedLeg } from '../state/ledger-state.js';
 import { membershipStatus, selectAddress, type AccountChoice } from './identity-state.js';
 import { Ledger, purseAddressOf } from './ledger.js';
-import { renderHome, type Degraded } from './screens.js';
+import { renderEntry, renderHome, type Degraded, type KnownTab } from './screens.js';
 import { bindPurse, restoreIdentity, serializeIdentity, type Identity } from './session.js';
+import { EXAMPLE_LEDGER } from '../config.js';
 import { createServices } from './services.js';
 import { APP_CSS } from './styles.js';
 
@@ -88,7 +89,28 @@ export async function mountApp(): Promise<void> {
 
   // --- rendering ----------------------------------------------------------
 
+  const knownTabs = (): KnownTab[] => {
+    const raw = safeStorage()?.getItem('tally.tabs');
+    if (!raw) return [];
+    try {
+      return (JSON.parse(raw) as KnownTab[]).slice(0, 6);
+    } catch {
+      return [];
+    }
+  };
+
+  const rememberTab = (id: string, name: string | null): void => {
+    const tabs = knownTabs().filter((tb) => tb.ledgerId !== id);
+    safeStorage()?.setItem('tally.tabs', JSON.stringify([{ ledgerId: id, name }, ...tabs].slice(0, 6)));
+  };
+
   const paint = (): void => {
+    // The bare origin is the Demo URL. It gets a real entry screen, never an
+    // empty solo tab with a dead button.
+    if (!ledger) {
+      root.innerHTML = renderEntry(knownTabs(), t);
+      return;
+    }
     const status = ledger
       ? membershipStatus(replayState([...ledger.entries]), walletAddresses, identity?.accountAddress ?? null)
       : { kind: 'not-a-member' as const };
@@ -306,6 +328,25 @@ export async function mountApp(): Promise<void> {
         applyTheme(document.documentElement, theme);
         return;
 
+      case 'example':
+        location.href = `/l/${EXAMPLE_LEDGER}${location.search}`;
+        return;
+
+      case 'open-tab':
+        if (id) location.href = `/l/${id}${location.search}`;
+        return;
+
+      case 'start-tab':
+        void (async () => {
+          try {
+            const created = await services.relay.createLedger(network);
+            location.href = `/l/${created.ledgerId}${location.search}`;
+          } catch {
+            window.prompt('Could not reach the relay. Try again when you are back online.');
+          }
+        })();
+        return;
+
       case 'join':
         void withBusy('Joining', doJoin);
         return;
@@ -413,6 +454,7 @@ export async function mountApp(): Promise<void> {
     ledger.loadFromCache();
     refreshView();
 
+    rememberTab(ledgerId as string, null);
     const source = await ledger.sync();
     if (source !== 'relay') degraded = { kind: 'offline', source: source === 'cache' ? 'cache' : 'none' };
     try {
@@ -422,6 +464,7 @@ export async function mountApp(): Promise<void> {
     }
     await observeChain();
     await refreshPurseBalance();
+    rememberTab(ledgerId as string, view.name);
     refreshView();
   }
 

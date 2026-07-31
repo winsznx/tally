@@ -27,7 +27,12 @@ export class HttpRelay implements RelayAdapter {
 
   constructor(baseUrl: string, fetchFn?: RelayFetch) {
     this.#base = baseUrl.replace(/\/$/, '');
-    this.#fetch = fetchFn ?? (globalThis.fetch as unknown as RelayFetch);
+    // Wrap rather than capture: `fetch` must be invoked with the global as its
+    // receiver. Storing it bare and calling `this.#fetch(...)` makes the adapter
+    // the receiver, which browsers reject with "Illegal invocation" while Node
+    // and injected test doubles happily allow, so it only breaks in production.
+    this.#fetch =
+      fetchFn ?? ((url, init) => globalThis.fetch(url, init as RequestInit) as unknown as ReturnType<RelayFetch>);
   }
 
   async #json<T>(path: string, init?: { method?: string; body?: unknown }): Promise<T> {

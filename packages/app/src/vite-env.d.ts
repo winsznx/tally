@@ -5,6 +5,7 @@ interface ImportMetaEnv {
   readonly VITE_RELAY_URL?: string;
   readonly VITE_TESTNET_RPC_URL?: string;
   readonly VITE_MAINNET_RPC_URL?: string;
+  readonly VITE_EXAMPLE_LEDGER?: string;
 }
 
 interface ImportMeta {

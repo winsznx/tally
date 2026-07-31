@@ -4,7 +4,14 @@ export const APP_CSS = `
 :root.tkl{--pg:#FFFFFF;--card:#F7F5F2;--tx:#1C1512;--sec:#55504C;--mut:#756D63;--hl:#E3DED7;--btn:#1C1512;--btnTx:#FFFFFF;--amb:#A05E00;--ok:#0B7A46;--warnBg:#FBF0D8;--calmBg:#EAF3EC}
 *{box-sizing:border-box}
 body{margin:0;background:var(--pg);color:var(--tx);font-family:Mulish,system-ui,-apple-system,sans-serif;font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased}
-.wrap{max-width:460px;margin:0 auto;min-height:100vh;padding:calc(12px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) calc(24px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left))}
+.wrap{max-width:460px;margin:0 auto;min-height:100dvh;display:flex;flex-direction:column;padding:calc(12px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) calc(24px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left))}
+.wrap>.actions{margin-top:auto;padding-top:18px}
+.entry-body{flex:1;display:flex;flex-direction:column;justify-content:center;gap:2px}
+.mark{font:900 30px/1 ui-monospace,Menlo,monospace;letter-spacing:6px;color:var(--amb);margin-bottom:16px}
+.entry-h{font-size:26px;font-weight:900;letter-spacing:-0.02em;line-height:1.2;margin:0 0 8px}
+.entry-s{color:var(--sec);font-size:14.5px;line-height:1.55;font-weight:600;margin:0 0 22px}
+.entry .btn{margin-top:10px}
+.tab-row{display:flex;justify-content:space-between;align-items:center;width:100%;min-height:48px;background:none;border:none;border-top:1px solid var(--hl);color:var(--tx);font-size:14px;font-weight:800;text-align:left}
 .hdr{display:flex;align-items:center;gap:10px;padding:6px 2px 16px}
 .brand{font-size:17px;font-weight:900;letter-spacing:-0.01em}
 .chip{font:800 10px ui-monospace,Menlo,monospace;padding:3px 8px;border-radius:99px;background:var(--amb);color:#14100E;letter-spacing:.04em}

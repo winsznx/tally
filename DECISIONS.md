@@ -48,9 +48,28 @@ An approval step was considered and rejected. It adds friction to a 60 second on
 
 ### The purse is generated, not derived from the signature
 
-The PRD's primary design derives the purse from the binding signature, so it re-derives on any device with no backup. That needs the signed message to name the purse public key, which you can't do before deriving it, so doing both takes two account signatures and setup becomes three dialogs instead of the promised two. The derivation signature also can't be published, because its hash is the purse seed.
+The PRD's primary design derives the purse from the binding signature, so it re-derives on any device with no backup. That needs the signed message to name the purse public key, which you can't do before deriving it, so doing both would take two separate account signatures on top of address selection. The derivation signature also can't be published, because its hash is the purse seed.
 
-So the purse is generated randomly and attested with one signature, which is the PRD's own documented fallback. Setup stays at two dialogs, accountability is unchanged, and nothing depends on `nimiq.sign()` being deterministic, which the device gate hasn't yet confirmed.
+So the purse is generated randomly and attested with one signature, which is the PRD's own documented fallback. Accountability is unchanged, the binding still proves which account the purse speaks for, and nothing depends on `nimiq.sign()` being deterministic, which the device gate hasn't yet confirmed. See the dialog-count decision below for what this costs at join time.
+
+### Joining costs two dialogs, and the one-dialog alternative was rejected
+
+Joining takes two approvals: `listAccounts` to choose the address, then the
+binding signature. The second is structural. A member's very first log entry
+must already carry an attested purse, and the attestation has to name the purse
+inside a publishable message, so the purse must exist before the signature and
+the address must be known before the message.
+
+The one-dialog alternative was considered: generate the purse randomly, skip
+address selection by recovering the account from the signature's returned public
+key, and back the purse key up to the relay encrypted under a signature-derived
+key. It was rejected because it trades cross-device recovery that needs nothing
+written down for one dialog nobody will notice, and it makes recovery depend on
+an untrusted relay being reachable. A relay that is down would stop being an
+inconvenience and start being data loss.
+
+The PRD originally estimated one dialog for joining. That was wrong, and the PRD
+has been corrected rather than the number quietly restated.
 
 ### Manual mode is a first-class path, not a fallback
 

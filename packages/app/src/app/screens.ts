@@ -163,9 +163,7 @@ export function renderRound(r: RoundView, names: Map<string, string>, t: Transla
  */
 export function renderPreview(vm: LedgerViewModel, names: Map<string, string>, t: Translator): string {
   const plan = vm.preview;
-  if (!plan) {
-    return `<section class="card"><p class="note">Nothing to settle yet. Add an expense to start the tab.</p></section>`;
-  }
+  if (!plan) return '';
   const obligationCount = vm.members.filter((m) => m.position !== 0n).length;
   const dropped = plan.participants.filter((p) => !plan.transfers.some((t2) => t2.from === p || t2.to === p));
   return `
@@ -298,6 +296,30 @@ function renderAccountStrip(o: HomeOpts, t: Translator): string {
   </section>`;
 }
 
+/**
+ * A tab with one person in it is not a tab. An obligation needs a debtor and a
+ * creditor, so with no other members there is nobody to owe and "add an expense"
+ * is the wrong instruction. Three distinct states, never one.
+ */
+function renderEmptyState(vm: LedgerViewModel, o: HomeOpts): string {
+  if (vm.preview || vm.openRound || vm.requestsForMe.length > 0) return ''; // a real ledger
+  const others = vm.members.filter((m) => m.address !== vm.myAddressForSettle).length;
+
+  if (o.membership === 'active' && others === 0) {
+    return `<section class="card">
+      <div class="collapse-h"><strong>Invite someone</strong></div>
+      <p class="note">A tab needs at least two people. Invite someone and start putting things on it.</p>
+      <button class="btn" data-action="invite">Share the invite link</button>
+    </section>`;
+  }
+  if (o.membership === 'active') {
+    return `<section class="card">
+      <p class="note">Nothing on this tab yet. Add the first expense and it will start netting.</p>
+    </section>`;
+  }
+  return '';
+}
+
 export function renderHome(
   vm: LedgerViewModel,
   names: Map<string, string>,
@@ -305,8 +327,18 @@ export function renderHome(
   degraded: Degraded,
   opts: HomeOpts,
 ): string {
+  // A non-member has no position, so "0 NIM, settled up" would be a lie. Show
+  // the tab's size instead, which is what an onlooker actually wants to know.
+  const onlooker = vm.myPosition === null;
   const owed = vm.myPosition ?? 0n;
-  const heading = owed > 0n ? t.t('ledger.youAreOwed') : owed < 0n ? t.t('ledger.youOwe') : t.t('ledger.settled');
+  const owing = vm.members.filter((m) => m.position !== 0n).length;
+  const heading = onlooker
+    ? `${vm.members.length} people, ${owing} with something outstanding`
+    : owed > 0n
+      ? t.t('ledger.youAreOwed')
+      : owed < 0n
+        ? t.t('ledger.youOwe')
+        : t.t('ledger.settled');
   return `
     <div class="wrap">
       <header class="hdr">
@@ -316,16 +348,21 @@ export function renderHome(
       </header>
       ${renderDegraded(degraded, t)}
       <section class="hero">
-        <div class="pos">${nim(owed < 0n ? -owed : owed)}<span class="unit"> NIM</span></div>
-        <div class="sub">${esc(heading)}</div>
+        <div class="pos">${onlooker ? nim(vm.members.reduce((a, m) => (m.position > 0n ? a + m.position : a), 0n)) : nim(owed < 0n ? -owed : owed)}<span class="unit"> NIM</span></div>
+        <div class="sub">${esc(onlooker ? `outstanding across ${heading}` : heading)}</div>
       </section>
       ${opts.busy ? `<div class="banner calm" role="status"><div class="banner-t">${esc(opts.busy)}</div></div>` : ''}
+      ${renderEmptyState(vm, opts)}
       ${renderRequests(vm, names, t)}
       ${vm.openRound ? renderRound(vm.openRound, names, t) : opts.canSettle ? renderPreview(vm, names, t) : ''}
       ${vm.openRound && vm.openRound.legs.some((l) => l.status === 'waiting' && l.from === vm.myAddressForSettle) ? `<button class="btn" data-action="settle">${opts.mode === 'purse' ? 'Settle my share' : 'Settle my share (1 approval per payment)'}</button>` : ''}
       ${renderAccountStrip(opts, t)}
       <div class="actions">
-        ${opts.membership === 'active' ? `<button class="btn" data-action="add">${t.t('obligation.add')}</button>` : ''}
+        ${
+          opts.membership === 'active' && vm.members.filter((m) => m.address !== vm.myAddressForSettle).length > 0
+            ? `<button class="btn" data-action="add">${t.t('obligation.add')}</button>`
+            : ''
+        }
         <button class="btn ghost" data-action="invite">Invite someone</button>
       </div>
     </div>`;
@@ -351,4 +388,48 @@ export function renderShareSheet(inviteUrl: string, deeplinkUrl: string, isMobil
       <p class="note">${esc(INVITE_DISCLOSURE)}</p>
       <button class="btn" data-action="share" data-url="${esc(primary)}">Share link</button>
     </section>`;
+}
+
+export interface KnownTab {
+  ledgerId: string;
+  name: string | null;
+}
+
+/**
+ * The bare origin inside Nimiq Pay. This is the Demo URL, so it has to say what
+ * Tally is and get someone to a populated ledger immediately. An empty solo tab
+ * is the wrong first impression: the strongest thing this product does is the
+ * collapse, and that needs data to show.
+ */
+export function renderEntry(myTabs: KnownTab[], t: Translator): string {
+  return `
+    <div class="wrap entry">
+      <header class="hdr">
+        <strong class="brand">${esc(t.t('app.name'))}</strong>
+        <button class="tog" data-action="theme">◐</button>
+      </header>
+      <div class="entry-body">
+        <div class="mark" aria-hidden="true">|||</div>
+        <h1 class="entry-h">Keep a running tab with your people.</h1>
+        <p class="entry-s">Debts between friends net down to the fewest possible payments, then clear in NIM.</p>
+
+        ${
+          myTabs.length
+            ? `<section class="card">
+                <div class="collapse-h"><strong>Your tabs</strong></div>
+                ${myTabs
+                  .map(
+                    (tab) =>
+                      `<button class="tab-row" data-action="open-tab" data-id="${esc(tab.ledgerId)}">${esc(tab.name ?? 'Untitled tab')}<span class="dim">open</span></button>`,
+                  )
+                  .join('')}
+              </section>`
+            : ''
+        }
+
+        <button class="btn" data-action="example">See a live example</button>
+        <button class="btn ghost" data-action="start-tab">Start a tab</button>
+        <p class="note">The example is a real ledger with four people and five debts in it, read-only. Nothing touches your wallet until you choose to join something.</p>
+      </div>
+    </div>`;
 }

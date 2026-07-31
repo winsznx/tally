@@ -49,7 +49,7 @@ We considered settling in USDT and rejected it. Gas kills the premise, and askin
 
 ### The purse
 
-At setup the user signs one message with their Nimiq Pay key. That signature is the attestation binding an app-generated key, the purse, to their real account.
+Joining a tab takes two approvals: one to choose which of your addresses is you, and one to sign the message binding an app-generated key, the purse, to that account. Both are structural. The log requires an attested purse from a member's first entry, and the message has to name the purse, which is only known once it exists. Funding the purse is a third approval, and it is optional forever.
 
 ```mermaid
 sequenceDiagram
@@ -58,14 +58,15 @@ sequenceDiagram
     participant P as Nimiq Pay
     participant C as Nimiq chain
 
-    U->>T: Enable auto-settle
+    U->>T: Join this tab
+    T->>P: listAccounts
+    P->>U: Approval dialog 1
     T->>T: generate purse keypair
     T->>P: sign binding message naming the purse
-    P->>U: Approval dialog 1 of 2
-    U-->>P: Approve
-    U->>T: Top up the purse
+    P->>U: Approval dialog 2
+    U->>T: Top up the purse (optional)
     T->>P: sendBasicTransaction to purse address
-    P->>U: Approval dialog 2 of 2
+    P->>U: Approval dialog 3
     Note over T,C: From here the purse acts alone.
 ```
 

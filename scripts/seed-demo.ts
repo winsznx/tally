@@ -203,11 +203,80 @@ async function fetchEntries(relayUrl: string, ledgerId: string): Promise<LogEntr
   return out;
 }
 
+/**
+ * The permanent public example: all four members are script identities and all
+ * five PRD 3.2 obligations are accepted, so the settlement preview works the
+ * instant it loads. Nobody joins it, it is read-only by convention, and it is
+ * seeded separately from a recording ledger so a demo run cannot break it.
+ */
+async function seedExample(relayUrl: string, origin: string): Promise<void> {
+  const ada = createMember('Ada');
+  const bo = createMember('Bo');
+  const cy = createMember('Cy');
+  const dee = createMember('Dee');
+
+  const log = new Author();
+  const observedHeight = 1;
+  const owe = (debtor: Member, creditor: Member, amount: bigint): void => {
+    const p = log.author(creditor, 'OBLIGATION_PROPOSE', {
+      debtor: debtor.address,
+      creditor: creditor.address,
+      amount: amount.toString(),
+    });
+    log.author(debtor, 'OBLIGATION_ACCEPT', { proposeId: entryId(p), observedHeight });
+  };
+
+  log.author(ada, 'LEDGER_OPEN', { name: 'Lisbon trip (live example)' });
+  log.author(bo, 'MEMBER_JOIN', {});
+  log.author(cy, 'MEMBER_JOIN', {});
+  log.author(dee, 'MEMBER_JOIN', {});
+
+  owe(ada, bo, 500n * NIM);
+  owe(bo, cy, 500n * NIM);
+  owe(cy, ada, 500n * NIM);
+  owe(ada, dee, 1200n * NIM);
+  owe(bo, dee, 300n * NIM);
+
+  for (const e of log.entries) validateEntry(e);
+  const state = replayState(log.entries);
+  if (state.ignored.length > 0) {
+    for (const i of state.ignored) console.error(`  ${i.entryType}: ${i.reason}`);
+    throw new Error('the example log does not verify');
+  }
+  if (state.acceptedPending.length !== 5) throw new Error('expected 5 accepted obligations');
+
+  const plan = computePlan(
+    state.members.map((m) => m.address),
+    state.acceptedPending.map((o): Obligation => ({ debtor: o.debtor, creditor: o.creditor, amount: o.amount })),
+    'minimal',
+  );
+  if (plan.transfers.length !== 2) throw new Error(`expected 2 transfers, got ${plan.transfers.length}`);
+
+  const { ledgerId } = (await relayPost(relayUrl, '/l', { network: 5 })) as { ledgerId: string };
+  await relayPost(relayUrl, `/l/${ledgerId}/entries`, { entries: log.entries.map(toRecord) });
+
+  const nim = (l: bigint): string => (l / NIM).toLocaleString('en-US');
+  const nameOf = (a: string): string =>
+    [ada, bo, cy, dee].find((m) => m.address === a)?.name ?? a.slice(0, 8);
+  console.log('\nSeeded the permanent live example. Five obligations, all accepted.\n');
+  for (const t of plan.transfers) {
+    console.log(`  ${nameOf(t.from).padEnd(4)} -> ${nameOf(t.to).padEnd(4)} ${nim(t.amount).padStart(5)} NIM`);
+  }
+  console.log(`\nSet this as the example ledger id in packages/app/src/config.ts:\n`);
+  console.log(`  VITE_EXAMPLE_LEDGER=${ledgerId}\n`);
+  console.log(`  ${origin}/l/${ledgerId}\n`);
+}
+
 async function main(): Promise<void> {
   const relayUrl = (arg('--relay') ?? 'http://localhost:8787').replace(/\/$/, '');
   const origin = (arg('--origin') ?? 'http://localhost:5174').replace(/\/$/, '');
   const expectAda = arg('--ada') ? toAddressHex(arg('--ada') as string) : null;
   const finishId = arg('--finish');
+
+  if (process.argv.includes('--example')) {
+    await seedExample(relayUrl, origin);
+    return;
+  }
 
   const seeded = finishId ? loadMembers(finishId) : [createMember('Bo'), createMember('Cy'), createMember('Dee')];
   const [bo, cy, dee] = seeded as [Member, Member, Member];
