@@ -56,6 +56,26 @@ describe('provider: deserializes the returned serialized tx (docs say hash, wron
     expect(sig.kind).toBe('declined');
     delete (globalThis as unknown as { window?: unknown }).window;
   });
+
+  it('classifies a THROWN decline object (not just a resolved one) as declined', async () => {
+    const provider = new NimiqPayProvider();
+    (globalThis as unknown as { window: unknown }).window = {
+      nimiq: {
+        // the host rejects with an ErrorResponse-shaped object rather than resolving it
+        sendBasicTransaction: async () => {
+          throw { error: { type: 'DECLINED', message: 'user rejected the request' } };
+        },
+        sign: async () => {
+          throw new Error('the user declined');
+        },
+      },
+      nimiqPay: { language: 'en' },
+    };
+    await provider.init();
+    expect((await provider.sendBasicTransaction({ recipient: 'NQ', value: 1n })).kind).toBe('declined');
+    expect((await provider.sign('x')).kind).toBe('declined');
+    delete (globalThis as unknown as { window?: unknown }).window;
+  });
 });
 
 describe('network guard (GAP 3)', () => {

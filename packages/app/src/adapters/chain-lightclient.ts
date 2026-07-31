@@ -10,7 +10,7 @@
  * core, which are fully tested.
  */
 import type { Client, PlainTransactionDetails } from '@nimiq/core';
-import { MAINNET, TESTNET, type ChainAdapter, type ChainTx, type NetworkId } from './types.js';
+import { MAINNET, TESTNET, type ChainAdapter, type ChainTx, type ConsensusState, type NetworkId } from './types.js';
 
 type Core = typeof import('@nimiq/core');
 
@@ -84,6 +84,12 @@ export class LightClientChain implements ChainAdapter {
   async subscribe(addresses: string[], onTx: (tx: ChainTx) => void): Promise<() => void> {
     const client = await this.#c();
     const handle = await client.addTransactionListener((tx) => onTx(toChainTx(tx)), addresses);
+    return () => void client.removeListener(handle);
+  }
+
+  async onConsensusChanged(cb: (state: ConsensusState) => void): Promise<() => void> {
+    const client = await this.#c();
+    const handle = await client.addConsensusChangedListener((state) => cb(state as ConsensusState));
     return () => void client.removeListener(handle);
   }
 }

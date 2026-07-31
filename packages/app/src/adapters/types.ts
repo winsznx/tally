@@ -115,6 +115,13 @@ export interface ChainAdapter {
    * app falls back to its heartbeat poll — visibly, never to silence.
    */
   subscribe?(addresses: string[], onTx: (tx: ChainTx) => void): Promise<() => void>;
+  /**
+   * Observe consensus state so the app can show the "connection lost" banner and
+   * freeze settlement (obligations still record locally). Adapters that cannot
+   * observe consensus (bare RPC) omit this; the app treats its absence as
+   * "assume established" and relies on request failures instead.
+   */
+  onConsensusChanged?(cb: (state: ConsensusState) => void): Promise<() => void>;
 }
 
 /** One signed log entry as carried by the relay (opaque payload/signature). */

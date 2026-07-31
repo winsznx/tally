@@ -37,6 +37,15 @@ function isErrorResponse(x: unknown): x is ErrorResponse {
 }
 
 /**
+ * Synchronous inside-Nimiq-Pay check for the origin split and the read-only
+ * preview — `window.nimiqPay` is seeded before the page script runs, so this is
+ * reliable and never blocks first paint on `init()`'s connect timeout.
+ */
+export function isInsideNimiqPaySync(): boolean {
+  return typeof window !== 'undefined' && typeof window.nimiqPay !== 'undefined';
+}
+
+/**
  * The SDK/wallet surfaces a declined dialog as an error object or a thrown
  * error. We classify: user rejection → `declined`; anything else → `error`.
  */
@@ -145,7 +154,16 @@ export class NimiqPayProvider implements ProviderAdapter {
   }
 
   #fromThrow(e: unknown): ProviderResult<never> {
-    const m = e instanceof Error ? e.message : String(e);
+    const m = this.#messageOf(e);
     return looksDeclined(m) ? DECLINED : providerError(m);
+  }
+
+  /** A thrown decline can be an ErrorResponse or a bare {message} object, not
+   * only an Error — mirror the resolve path so it still classifies as declined. */
+  #messageOf(e: unknown): string {
+    if (isErrorResponse(e)) return JSON.stringify(e.error);
+    if (e instanceof Error) return e.message;
+    if (typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string') return e.message;
+    return String(e);
   }
 }
