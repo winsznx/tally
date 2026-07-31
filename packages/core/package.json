@@ -1,0 +1,28 @@
+{
+  "name": "@tally/core",
+  "version": "0.1.0",
+  "description": "Tally core: netting engine, anchor commitments, signed ledger log, deterministic transaction construction",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./netting": "./core/netting/index.ts",
+    "./anchor": "./core/anchor/index.ts",
+    "./log": "./core/log/index.ts",
+    "./tx": "./core/tx/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@nimiq/core": "^2.7.2"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "fast-check": "^3.19.0",
+    "typescript": "^5.5.0",
+    "vitest": "^2.1.0"
+  }
+}
