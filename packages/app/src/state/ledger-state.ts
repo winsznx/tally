@@ -5,6 +5,7 @@
  * DERIVED here from the entries and the chain, never kept as separate mutable
  * state that could drift.
  */
+import { PublicKey } from '@nimiq/core';
 import {
   computePlan,
   type Obligation,
@@ -18,6 +19,15 @@ import {
   type LogEntry,
   type ObligationRecord,
 } from '@tally/core/log';
+
+/** The purse address a member pays from (their MEMBER_JOIN publishes the key). */
+function purseAddressOf(pursePublicKeyHex: string): string {
+  const bytes = new Uint8Array(pursePublicKeyHex.length / 2);
+  for (let i = 0; i < bytes.length; i++) bytes[i] = parseInt(pursePublicKeyHex.slice(i * 2, i * 2 + 2), 16);
+  return Array.from(PublicKey.deserialize(bytes).toAddress().serialize(), (b) =>
+    b.toString(16).padStart(2, '0'),
+  ).join('');
+}
 
 /** The 7,200-block validity window is ~2 hours; a round dies when it passes. */
 export const VALIDITY_WINDOW_BLOCKS = 7200;
@@ -173,8 +183,14 @@ function deriveRoundView(state: LedgerState, input: DeriveInput): RoundView {
   const plan = computePlan(memberAddrs, toObligations(inRound), round.mode);
 
   const observed = input.observedLegs ?? [];
+  // A leg is paid FROM the payer's purse in purse mode and from their ACCOUNT in
+  // manual mode, so an on-chain settlement matches a plan leg on either address.
+  const purseByAccount = new Map(state.members.map((m) => [m.address, purseAddressOf(m.pursePublicKey)]));
   const legs: LegView[] = plan.transfers.map((t: Transfer) => {
-    const match = observed.find((o) => o.from === t.from && o.to === t.to && o.amount === t.amount);
+    const payerPurse = purseByAccount.get(t.from);
+    const match = observed.find(
+      (o) => (o.from === t.from || o.from === payerPurse) && o.to === t.to && o.amount === t.amount,
+    );
     let status: LegStatus;
     if (match) status = match.confirmed ? 'landed' : 'sending';
     else status = 'waiting';
