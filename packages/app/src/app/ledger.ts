@@ -228,6 +228,12 @@ export class Ledger {
       round: state.lastClosedRound + 1,
       anchorHeight: derivedAnchorHeight(accepted),
       mode,
+      // Pin what this round settles. Two devices with the same accepted set
+      // produce the identical payload (and so the identical entry, GAP 1); a
+      // device with a different view produces a different round rather than
+      // silently mutating this one.
+      participants: state.members.map((m) => m.address).sort(),
+      consumed: accepted.map((o) => o.proposeId).sort(),
     });
     await this.#commit(entry);
     return entry;
@@ -241,7 +247,9 @@ export class Ledger {
     const state = replayState(this.#entries);
     const open = state.openRound;
     if (!open) return null;
-    const members = state.members.map((m) => m.address);
+    // The round's OWN participant set, pinned when it opened — never the live
+    // member list, which a mid-round join would change under an anchored root.
+    const members = open.participants;
 
     let root = GENESIS_ROOT;
     for (let r = 1; r <= open.round; r++) {
@@ -266,7 +274,7 @@ export class Ledger {
     if (!open || !root || !state.genesisHash) return null;
     const inRound = state.obligations.filter((o) => o.round === open.round);
     const plan = computePlan(
-      state.members.map((m) => m.address),
+      open.participants,
       inRound.map((o): Obligation => ({ debtor: o.debtor, creditor: o.creditor, amount: o.amount })),
       open.mode,
     );
@@ -301,7 +309,7 @@ export class Ledger {
 
     const inRound = state.obligations.filter((o) => o.round === open.round);
     const plan = computePlan(
-      state.members.map((m) => m.address),
+      open.participants,
       inRound.map((o): Obligation => ({ debtor: o.debtor, creditor: o.creditor, amount: o.amount })),
       open.mode,
     );

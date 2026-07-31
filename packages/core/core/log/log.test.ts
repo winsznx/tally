@@ -73,6 +73,20 @@ function makeEntry(
 // derived from the consumed accepts, so single-accept rounds open at this value.
 const ACCEPT_HEIGHT = 41200;
 
+/** Build a ROUND_OPEN payload pinning the ledger's members and accepted set. */
+function roundPayload(log: TallyLog, round = 1, mode: 'minimal' | 'pairwise' = 'minimal', anchorHeight?: number) {
+  const st = log.replay();
+  const accepted = st.obligations.filter((o) => o.status === 'ACCEPTED');
+  return {
+    round,
+    anchorHeight: anchorHeight ?? (accepted.length ? derivedAnchorHeight(accepted) : ACCEPT_HEIGHT),
+    mode,
+    participants: st.members.map((m) => m.address).sort(),
+    consumed: accepted.map((o) => o.proposeId).sort(),
+  };
+}
+
+
 const stringify = (v: unknown): string =>
   JSON.stringify(v, (_k, x) => (typeof x === 'bigint' ? `${x}n` : x));
 
@@ -203,7 +217,7 @@ describe('order-independent replay', () => {
     log.append(
       makeEntry(bob, 'OBLIGATION_PROPOSE', { debtor: addr(bob), creditor: addr(carol), amount: '750' }, log.headHash, 5),
     );
-    log.append(makeEntry(alice, 'ROUND_OPEN', { round: 1, anchorHeight: 41200, mode: 'minimal' }, log.headHash, 6));
+    log.append(makeEntry(alice, 'ROUND_OPEN', roundPayload(log), log.headHash, 6));
     const entries = [...log.all()];
     const reference = stringify(replayState(entries));
     const rand = mulberry32(0x5eed);
@@ -381,7 +395,7 @@ describe('rounds', () => {
 
   it('ROUND_OPEN consumes accepted obligations; ROUND_EXPIRE returns them', () => {
     const { log, acceptId } = ledgerWithAccepted();
-    log.append(makeEntry(alice, 'ROUND_OPEN', { round: 1, anchorHeight: 41200, mode: 'minimal' }, log.headHash, 4));
+    log.append(makeEntry(alice, 'ROUND_OPEN', roundPayload(log), log.headHash, 4));
     let state = log.replay();
     expect(state.acceptedPending).toEqual([]);
     expect(state.openRound).toMatchObject({ round: 1, anchorHeight: 41200, consumedAcceptIds: [acceptId] });
@@ -402,7 +416,7 @@ describe('rounds', () => {
       {
         prevEntryHash: log.headHash,
         entryType: 'ROUND_OPEN',
-        payload: { round: 1, anchorHeight: 999999, mode: 'minimal' },
+        payload: roundPayload(log, 1, 'minimal', 999999),
         authorAddress: addr(alice),
         pursePublicKey: pursePk(mallory),
         nonce: nextNonce(),
@@ -416,7 +430,7 @@ describe('rounds', () => {
     expect(state.ignored.some((i) => i.entryType === 'ROUND_OPEN' && i.reason.includes('purse key'))).toBe(true);
 
     // A legitimate open, then a forged expire attempt.
-    log.append(makeEntry(alice, 'ROUND_OPEN', { round: 1, anchorHeight: 41200, mode: 'minimal' }, log.headHash, 5));
+    log.append(makeEntry(alice, 'ROUND_OPEN', roundPayload(log), log.headHash, 5));
     const forgedExpire = signEntry(
       {
         prevEntryHash: log.headHash,
@@ -457,9 +471,9 @@ describe('rounds', () => {
 
     // alice (the settler) on three devices builds the SAME ROUND_OPEN: derived
     // height + content-derived nonce ⇒ byte-identical ⇒ collapses on entry ID.
-    const roundPayload = { round: 1, anchorHeight: anchor, mode: 'minimal' as const };
-    const nonce = deterministicNonce('ROUND_OPEN', roundPayload);
-    const device = (): LogEntry => makeEntry(alice, 'ROUND_OPEN', roundPayload, head, 7, nonce);
+    const rp = roundPayload(log, 1, 'minimal', anchor);
+    const nonce = deterministicNonce('ROUND_OPEN', rp);
+    const device = (): LogEntry => makeEntry(alice, 'ROUND_OPEN', rp, head, 7, nonce);
     const d1 = device();
     const d2 = device();
     const d3 = device();
@@ -471,35 +485,69 @@ describe('rounds', () => {
 
   it('rejects a ROUND_OPEN whose anchorHeight is not the log-derived height (would fork)', () => {
     const { log } = ledgerWithAccepted();
-    log.append(makeEntry(alice, 'ROUND_OPEN', { round: 1, anchorHeight: ACCEPT_HEIGHT + 3, mode: 'minimal' }, log.headHash, 4));
+    log.append(makeEntry(alice, 'ROUND_OPEN', roundPayload(log, 1, 'minimal', ACCEPT_HEIGHT + 3), log.headHash, 4));
     const state = log.replay();
     expect(state.openRound).toBeNull();
     expect(state.ignored.some((i) => i.entryType === 'ROUND_OPEN' && i.reason.includes('log-derived'))).toBe(true);
   });
 
   it('refuses to open a round with no accepted obligations', () => {
-    const { log } = basicLedger();
-    log.append(makeEntry(alice, 'ROUND_OPEN', { round: 1, anchorHeight: ACCEPT_HEIGHT, mode: 'minimal' }, log.headHash, 3));
-    const state = log.replay();
-    expect(state.openRound).toBeNull();
-    expect(state.ignored.some((i) => i.reason.includes('no accepted obligations'))).toBe(true);
+    const { log } = basicLedger(); // nothing accepted yet
+    // A round must pin what it settles, so an empty round cannot even be built.
+    expect(() => makeEntry(alice, 'ROUND_OPEN', roundPayload(log), log.headHash, 3)).toThrow(LogError);
   });
 
   it('rejects a ROUND_OPEN anchorHeight above the u32 ceiling at the payload boundary', () => {
     const { log } = ledgerWithAccepted();
     expect(() =>
-      makeEntry(alice, 'ROUND_OPEN', { round: 1, anchorHeight: 0x1_0000_0000, mode: 'minimal' }, log.headHash, 4),
+      makeEntry(alice, 'ROUND_OPEN', roundPayload(log, 1, 'minimal', 0x1_0000_0000), log.headHash, 4),
     ).toThrow(LogError);
   });
 
   it('rounds must open in sequence and never concurrently', () => {
     const { log } = ledgerWithAccepted();
-    log.append(makeEntry(alice, 'ROUND_OPEN', { round: 5, anchorHeight: ACCEPT_HEIGHT, mode: 'minimal' }, log.headHash, 4));
-    log.append(makeEntry(alice, 'ROUND_OPEN', { round: 1, anchorHeight: ACCEPT_HEIGHT, mode: 'minimal' }, log.headHash, 5));
-    log.append(makeEntry(bob, 'ROUND_OPEN', { round: 2, anchorHeight: ACCEPT_HEIGHT, mode: 'minimal' }, log.headHash, 6));
+    const pinned = roundPayload(log); // the one accepted set, captured once
+    log.append(makeEntry(alice, 'ROUND_OPEN', { ...pinned, round: 5 }, log.headHash, 4)); // out of sequence
+    log.append(makeEntry(alice, 'ROUND_OPEN', pinned, log.headHash, 5)); // round 1: opens
+    log.append(makeEntry(bob, 'ROUND_OPEN', { ...pinned, round: 2 }, log.headHash, 6)); // concurrent
     const state = log.replay();
     expect(state.openRound?.round).toBe(1);
     expect(state.ignored.filter((i) => i.entryType === 'ROUND_OPEN')).toHaveLength(2);
+  });
+
+  it('a late accept cannot change an already-opened round (double-payment guard)', () => {
+    // Round 1 pins its consumed set. An accept that folds in LATER — even at a
+    // lower clock — must not join that round and change its plan.
+    const { log, proposeId } = basicLedger(); // bob owes alice 500
+    log.append(makeEntry(carol, 'MEMBER_JOIN', {}, log.headHash, 3));
+    const p2 = makeEntry(alice, 'OBLIGATION_PROPOSE', { debtor: addr(carol), creditor: addr(alice), amount: '900' }, log.headHash, 4);
+    log.append(p2);
+    log.append(makeEntry(bob, 'OBLIGATION_ACCEPT', { proposeId }, log.headHash, 6));
+    const pinned = roundPayload(log); // pins ONLY bob's accepted obligation
+    const open = makeEntry(alice, 'ROUND_OPEN', pinned, log.headHash, 7);
+
+    // carol's accept arrives late, at a LOWER clock than the round open
+    const lateAccept = makeEntry(carol, 'OBLIGATION_ACCEPT', { proposeId: entryId(p2) }, log.headHash, 5);
+    const state = replayState([...log.all(), open, lateAccept]);
+
+    expect(state.openRound?.consumedProposeIds).toEqual([proposeId]);
+    expect(state.obligations.find((o) => o.proposeId === entryId(p2))?.round).toBeNull();
+    // the late one stays ACCEPTED and rolls into the next round instead
+    expect(state.acceptedPending.map((o) => o.proposeId)).toEqual([entryId(p2)]);
+  });
+
+  it('a member joining mid-round does not change the round participant set', () => {
+    const { log, proposeId } = basicLedger();
+    log.append(makeEntry(bob, 'OBLIGATION_ACCEPT', { proposeId }, log.headHash, 3));
+    const open = makeEntry(alice, 'ROUND_OPEN', roundPayload(log), log.headHash, 4);
+    log.append(open);
+    const before = log.replay().openRound?.participants;
+
+    log.append(makeEntry(carol, 'MEMBER_JOIN', {}, log.headHash, 5)); // latecomer
+    const after = log.replay().openRound?.participants;
+
+    expect(after).toEqual(before);
+    expect(after).not.toContain(addr(carol)); // the anchored root cannot move
   });
 });
 
@@ -583,7 +631,7 @@ describe('MEMBER_LEAVE (GAP C)', () => {
     ]);
 
     // and it can still settle: a round opens over it normally
-    log.append(makeEntry(alice, 'ROUND_OPEN', { round: 1, anchorHeight: ACCEPT_HEIGHT, mode: 'minimal' }, log.headHash, 5));
+    log.append(makeEntry(alice, 'ROUND_OPEN', roundPayload(log), log.headHash, 5));
     expect(log.replay().openRound?.round).toBe(1);
   });
 
@@ -637,7 +685,7 @@ describe('MEMBER_LEAVE (GAP C)', () => {
   it('departing while a round is open does not cancel the round', () => {
     const { log, proposeId } = basicLedger();
     log.append(makeEntry(bob, 'OBLIGATION_ACCEPT', { proposeId }, log.headHash, 3));
-    log.append(makeEntry(alice, 'ROUND_OPEN', { round: 1, anchorHeight: ACCEPT_HEIGHT, mode: 'minimal' }, log.headHash, 4));
+    log.append(makeEntry(alice, 'ROUND_OPEN', roundPayload(log), log.headHash, 4));
     log.append(makeEntry(bob, 'MEMBER_LEAVE', {}, log.headHash, 5));
     const state = log.replay();
     expect(state.openRound?.round).toBe(1);

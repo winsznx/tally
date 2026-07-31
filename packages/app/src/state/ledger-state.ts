@@ -136,7 +136,14 @@ export function deriveViewModel(input: DeriveInput): LedgerViewModel {
     preview = computePlan(memberAddrs, toObligations(state.acceptedPending as unknown as ObligationRecord[]), 'minimal');
   }
 
-  const positions = positionsForMembers(memberAddrs, state.acceptedPending);
+  // Positions must include obligations an open round has already consumed —
+  // otherwise the hero reads "0 NIM · settled up" the moment a round opens,
+  // while the money is still owed and has not moved.
+  const owedNow = [
+    ...state.acceptedPending,
+    ...state.obligations.filter((o) => o.status === 'IN_ROUND'),
+  ];
+  const positions = positionsForMembers(memberAddrs, owedNow);
   const myPosition = input.myAddress && positions.has(input.myAddress) ? (positions.get(input.myAddress) as bigint) : null;
 
   const requestsForMe = state.obligations.filter((o) => o.status === 'PROPOSED' && o.debtor === input.myAddress);
@@ -179,8 +186,8 @@ function positionsForMembers(
 function deriveRoundView(state: LedgerState, input: DeriveInput): RoundView {
   const round = state.openRound!;
   const inRound = state.obligations.filter((o) => o.round === round.round);
-  const memberAddrs = state.members.map((m) => m.address);
-  const plan = computePlan(memberAddrs, toObligations(inRound), round.mode);
+  // The round's pinned participant set, so the legs shown are the legs committed.
+  const plan = computePlan(round.participants, toObligations(inRound), round.mode);
 
   const observed = input.observedLegs ?? [];
   // A leg is paid FROM the payer's purse in purse mode and from their ACCOUNT in

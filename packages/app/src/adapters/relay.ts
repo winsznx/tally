@@ -63,7 +63,11 @@ export class HttpRelay implements RelayAdapter {
   }
 
   async append(ledgerId: string, entriesJson: string[]): Promise<void> {
-    await this.#json(`/l/${encodeURIComponent(ledgerId)}/entries`, { method: 'POST', body: { entries: entriesJson } });
+    // The wire format is an array of OBJECTS, not of JSON strings: the Worker
+    // validates each record's fields and signature directly. Posting the
+    // stringified form makes the relay reject every append, silently.
+    const entries = entriesJson.map((e) => JSON.parse(e) as unknown);
+    await this.#json(`/l/${encodeURIComponent(ledgerId)}/entries`, { method: 'POST', body: { entries } });
   }
 
   async stats(): Promise<number> {

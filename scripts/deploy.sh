@@ -88,11 +88,14 @@ say "Deploying the app to Cloudflare Pages"
 $WRANGLER pages project create "$PAGES_PROJECT" --production-branch main 2>/dev/null || true
 PAGES_OUT="$($WRANGLER pages deploy "$APP_DIR/dist" --project-name "$PAGES_PROJECT" --branch main 2>&1)"
 echo "$PAGES_OUT"
-PAGES_URL="$(printf '%s' "$PAGES_OUT" | grep -oE 'https://[a-zA-Z0-9.-]+\.pages\.dev' | tail -1)"
+# Prefer the STABLE alias (https://<project>.pages.dev) over the per-deployment
+# preview URL, which changes every deploy and is useless as a Demo URL.
+PAGES_URL="$(printf '%s' "$PAGES_OUT" | grep -oE "https://${PAGES_PROJECT}\\.pages\\.dev" | head -1)"
+if [ -z "$PAGES_URL" ]; then PAGES_URL="https://${PAGES_PROJECT}.pages.dev"; fi
 
 say "Done"
 echo "  App:   ${PAGES_URL:-see output above}"
 echo "  Relay: $RELAY_URL"
 echo "  Stats: $RELAY_URL/stats"
 echo
-echo "Load the app URL in Nimiq Pay via Mini Apps → Custom URL."
+echo "Load the app URL in Nimiq Pay: Discover → "Search or enter App URL"."

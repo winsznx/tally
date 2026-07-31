@@ -96,7 +96,23 @@ function buildLedgerEntries(): LogEntry[] {
   log.append(makeEntry(bob, 'OBLIGATION_ACCEPT', { proposeId: entryId(p2) }, log.headHash, 7));
   log.append(makeEntry(alice, 'OBLIGATION_ACCEPT', { proposeId: entryId(p3) }, log.headHash, 8));
 
-  log.append(makeEntry(alice, 'ROUND_OPEN', { round: 1, anchorHeight: 41_200, mode: 'minimal' }, log.headHash, 9));
+  const st = log.replay();
+  const accepted = st.obligations.filter((o) => o.status === 'ACCEPTED');
+  log.append(
+    makeEntry(
+      alice,
+      'ROUND_OPEN',
+      {
+        round: 1,
+        anchorHeight: 41_200,
+        mode: 'minimal',
+        participants: st.members.map((m) => m.address).sort(),
+        consumed: accepted.map((o) => o.proposeId).sort(),
+      },
+      log.headHash,
+      9,
+    ),
+  );
   return [...log.all()];
 }
 
@@ -112,11 +128,7 @@ function deviceComputation(entries: LogEntry[], device: KeyPair): {
   const roundObligations: Obligation[] = state.obligations
     .filter((ob) => ob.round === round.round)
     .map((ob) => ({ debtor: ob.debtor, creditor: ob.creditor, amount: ob.amount }));
-  const plan = computePlan(
-    state.members.map((m) => m.address),
-    roundObligations,
-    round.mode,
-  );
+  const plan = computePlan(round.participants, roundObligations, round.mode);
   const logRoot = obligationLogRoot(round.consumedAcceptIds);
   const roundRoot = computeRoundRoot(GENESIS_ROOT, logRoot, plan);
 

@@ -253,8 +253,34 @@ function validatePayload(entryType: EntryType, payload: Record<string, unknown>)
       if ('reason' in payload && typeof payload['reason'] !== 'string') throw new LogError('REJECT: reason must be a string');
       return;
     case 'ROUND_OPEN': {
-      expect(['round', 'anchorHeight', 'mode'], ['round', 'anchorHeight', 'mode']);
+      // A round PINS what it settles: the participant set and the exact
+      // obligations. Without this, an entry arriving later with a lower clock
+      // silently changes an already-paid round's plan — a double payment.
+      expect(
+        ['round', 'anchorHeight', 'mode', 'participants', 'consumed'],
+        ['round', 'anchorHeight', 'mode', 'participants', 'consumed'],
+      );
       const { round, anchorHeight, mode } = payload;
+      const participants = payload['participants'];
+      const consumed = payload['consumed'];
+      if (!Array.isArray(participants) || participants.length === 0) {
+        throw new LogError('ROUND_OPEN: participants must be a non-empty array');
+      }
+      for (const a of participants) {
+        if (typeof a !== 'string' || !ADDR_RE.test(a)) throw new LogError('ROUND_OPEN: bad participant address');
+      }
+      if (participants.some((a, i) => i > 0 && (participants[i - 1] as string) >= (a as string))) {
+        throw new LogError('ROUND_OPEN: participants must be sorted and unique');
+      }
+      if (!Array.isArray(consumed) || consumed.length === 0) {
+        throw new LogError('ROUND_OPEN: consumed must be a non-empty array');
+      }
+      for (const id of consumed) {
+        if (typeof id !== 'string' || !HASH_RE.test(id)) throw new LogError('ROUND_OPEN: bad consumed propose id');
+      }
+      if (consumed.some((id, i) => i > 0 && (consumed[i - 1] as string) >= (id as string))) {
+        throw new LogError('ROUND_OPEN: consumed must be sorted and unique');
+      }
       if (typeof round !== 'number' || !Number.isSafeInteger(round) || round < 1) {
         throw new LogError('ROUND_OPEN: round must be an integer >= 1');
       }
@@ -357,6 +383,13 @@ export interface OpenRound {
   round: number;
   anchorHeight: number;
   mode: NettingMode;
+  /**
+   * The participant set PINNED at the moment this round opened. Plans, roots and
+   * anchors for this round must be built from this list, never from the live
+   * member set — a member joining mid-round would otherwise change the committed
+   * root and make the same leg sign to different bytes (a second payment).
+   */
+  participants: AddressHex[];
   /** Entry IDs of the OBLIGATION_ACCEPT entries consumed by this round, sorted. */
   consumedAcceptIds: string[];
   /** Propose IDs of the obligations consumed by this round, sorted. */
@@ -598,11 +631,28 @@ export function replayState(entries: LogEntry[]): LedgerState {
           skip(s, `round ${round} out of sequence, expected ${lastClosedRound + 1}`);
           break;
         }
-        const consumed = [...obligations.values()]
-          .filter((ob) => ob.status === 'ACCEPTED')
-          .sort((a, b) => (a.proposeId < b.proposeId ? -1 : 1));
-        if (consumed.length === 0) {
-          skip(s, 'round has no accepted obligations to settle');
+        // Use exactly the obligations the round COMMITTED to. An accept that
+        // arrives later simply stays ACCEPTED and rolls into the next round; it
+        // can no longer alter a round whose money may already have moved.
+        const pinnedIds = e.payload['consumed'] as string[];
+        const pinnedParticipants = e.payload['participants'] as AddressHex[];
+        const consumed = pinnedIds
+          .map((id) => obligations.get(id))
+          .filter((ob): ob is ObligationRecord => ob !== undefined);
+        if (consumed.length !== pinnedIds.length) {
+          skip(s, 'round names an obligation that does not exist');
+          break;
+        }
+        if (consumed.some((ob) => ob.status !== 'ACCEPTED')) {
+          skip(s, 'round names an obligation that is not accepted');
+          break;
+        }
+        if (pinnedParticipants.some((a) => !members.has(a))) {
+          skip(s, 'round names a participant who is not a member');
+          break;
+        }
+        if (consumed.some((ob) => !pinnedParticipants.includes(ob.debtor) || !pinnedParticipants.includes(ob.creditor))) {
+          skip(s, 'round consumes an obligation outside its participant set');
           break;
         }
         // GAP 1: the anchor height is DERIVED from the log — the observedHeight
@@ -624,6 +674,7 @@ export function replayState(entries: LogEntry[]): LedgerState {
           round,
           anchorHeight: expectedAnchorHeight,
           mode: e.payload['mode'] as NettingMode,
+          participants: pinnedParticipants,
           consumedAcceptIds: consumed.map((ob) => ob.acceptId as string).sort(),
           consumedProposeIds: consumed.map((ob) => ob.proposeId),
         };

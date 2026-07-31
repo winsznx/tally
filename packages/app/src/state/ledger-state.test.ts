@@ -119,7 +119,14 @@ describe('deriveViewModel', () => {
     const log = workedExampleLog();
     const consumed = log.replay().obligations.filter((o) => o.status === 'ACCEPTED');
     const anchor = derivedAnchorHeight(consumed);
-    const roundPayload = { round: 1, anchorHeight: anchor, mode: 'minimal' as const };
+    const st0 = log.replay();
+    const roundPayload = {
+      round: 1,
+      anchorHeight: anchor,
+      mode: 'minimal' as const,
+      participants: st0.members.map((m) => m.address).sort(),
+      consumed: st0.obligations.filter((o) => o.status === 'ACCEPTED').map((o) => o.proposeId).sort(),
+    };
     log.append(
       signEntry(
         {
@@ -156,7 +163,14 @@ describe('deriveViewModel', () => {
     const log = workedExampleLog();
     const consumed = log.replay().obligations.filter((o) => o.status === 'ACCEPTED');
     const anchor = derivedAnchorHeight(consumed);
-    const roundPayload = { round: 1, anchorHeight: anchor, mode: 'minimal' as const };
+    const st0 = log.replay();
+    const roundPayload = {
+      round: 1,
+      anchorHeight: anchor,
+      mode: 'minimal' as const,
+      participants: st0.members.map((m) => m.address).sort(),
+      consumed: st0.obligations.filter((o) => o.status === 'ACCEPTED').map((o) => o.proposeId).sort(),
+    };
     log.append(
       signEntry(
         { prevEntryHash: log.headHash, entryType: 'ROUND_OPEN', payload: roundPayload, authorAddress: addr(ada), pursePublicKey: pursePk(ada), nonce: deterministicNonce('ROUND_OPEN', roundPayload), logicalClock: 20 },
