@@ -250,12 +250,60 @@ export function renderReconciliation(rows: ReconciliationRow[]): string {
 
 // --- home -------------------------------------------------------------------
 
+export interface HomeOpts {
+  showNetworkChip: boolean;
+  canSettle: boolean;
+  /** Membership as reconciled against the wallet's current addresses (GAP A/B). */
+  membership: 'not-a-member' | 'active' | 'left' | 'account-switched';
+  /** Purse balance in Luna once bound, else null. */
+  purseBalance: bigint | null;
+  purseAddress: string | null;
+  /** Auto-settle spends from the purse; manual asks per leg. */
+  mode: 'purse' | 'manual';
+  busy: string | null;
+}
+
+/**
+ * The account strip: whatever the user's next real step is. Joining, arming the
+ * purse, topping it up, or emptying it. Withdraw-all is reachable from here on
+ * every screen, which is a stated security property rather than a convenience.
+ */
+function renderAccountStrip(o: HomeOpts, t: Translator): string {
+  if (o.membership === 'not-a-member') {
+    return `<section class="card">
+      <p class="note">You are viewing this tab read-only. Nothing has touched your wallet.</p>
+      <button class="btn" data-action="join">Join this tab</button>
+    </section>`;
+  }
+  if (o.membership !== 'active') return '';
+
+  if (o.purseAddress === null) {
+    return `<section class="card">
+      <div class="collapse-h"><strong>${t.t('purse.title')}</strong><span class="dim">optional</span></div>
+      <p class="note">Settling currently asks you to approve each payment. Arming the purse lets Tally pay your share with no prompt. It is an app-managed key in this browser, its balance is the only thing at risk, and you can empty it in one tap at any time.</p>
+      <button class="btn" data-action="bind">${t.t('purse.sign')}</button>
+      <button class="btn ghost" data-action="skip-purse">${t.t('purse.skip')}</button>
+    </section>`;
+  }
+
+  const bal = o.purseBalance ?? 0n;
+  return `<section class="card">
+    <div class="collapse-h"><strong>Purse</strong><span class="dim">${o.mode === 'purse' ? 'auto-settle on' : 'manual'}</span></div>
+    <div class="leg"><span class="leg-w">Balance</span><span class="leg-a">${nim(bal)} NIM</span></div>
+    <div class="row">
+      <button class="btn sm" data-action="fund">Top up</button>
+      <button class="btn sm ghost" data-action="withdraw">Withdraw all</button>
+    </div>
+    ${bal === 0n ? '<p class="note">Empty. Top up and your share settles without a prompt.</p>' : ''}
+  </section>`;
+}
+
 export function renderHome(
   vm: LedgerViewModel,
   names: Map<string, string>,
   t: Translator,
   degraded: Degraded,
-  opts: { showNetworkChip: boolean; canSettle: boolean },
+  opts: HomeOpts,
 ): string {
   const owed = vm.myPosition ?? 0n;
   const heading = owed > 0n ? t.t('ledger.youAreOwed') : owed < 0n ? t.t('ledger.youOwe') : t.t('ledger.settled');
@@ -271,10 +319,14 @@ export function renderHome(
         <div class="pos">${nim(owed < 0n ? -owed : owed)}<span class="unit"> NIM</span></div>
         <div class="sub">${esc(heading)}</div>
       </section>
+      ${opts.busy ? `<div class="banner calm" role="status"><div class="banner-t">${esc(opts.busy)}</div></div>` : ''}
       ${renderRequests(vm, names, t)}
       ${vm.openRound ? renderRound(vm.openRound, names, t) : opts.canSettle ? renderPreview(vm, names, t) : ''}
+      ${vm.openRound && vm.openRound.legs.some((l) => l.status === 'waiting' && l.from === vm.myAddressForSettle) ? `<button class="btn" data-action="settle">${opts.mode === 'purse' ? 'Settle my share' : 'Settle my share (1 approval per payment)'}</button>` : ''}
+      ${renderAccountStrip(opts, t)}
       <div class="actions">
-        <button class="btn" data-action="add">${t.t('obligation.add')}</button>
+        ${opts.membership === 'active' ? `<button class="btn" data-action="add">${t.t('obligation.add')}</button>` : ''}
+        <button class="btn ghost" data-action="invite">Invite someone</button>
       </div>
     </div>`;
 }

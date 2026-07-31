@@ -13,9 +13,14 @@
  *   Bo  -> Cy   500      Bo  -> Dee   300
  *   Cy  -> Ada  500
  *
- * You join as Dee from your phone. The three-way cycle between Ada, Bo and Cy
- * cancels exactly, so the tab collapses to two transfers into your account and
- * Cy drops out of the round without opening anything.
+ * You join as ADA, the largest debtor, because Ada is the only seat where the
+ * mechanic actually fires: she pays Dee 1,200 with no dialog. Joining as the
+ * creditor would settle nothing on your device.
+ *
+ * Bo, Cy and Dee are seeded. The two obligations where ADA is the debtor are
+ * left PROPOSED on purpose: accepting them is a beat in the demo, it shows the
+ * consent model, and it means the collapse happens because of something you
+ * just did rather than something already sitting there.
  *
  * Usage:
  *   pnpm seed:demo --dee <your Nimiq Pay address> [--relay <url>] [--origin <url>]
@@ -201,11 +206,11 @@ async function fetchEntries(relayUrl: string, ledgerId: string): Promise<LogEntr
 async function main(): Promise<void> {
   const relayUrl = (arg('--relay') ?? 'http://localhost:8787').replace(/\/$/, '');
   const origin = (arg('--origin') ?? 'http://localhost:5174').replace(/\/$/, '');
-  const expectDee = arg('--dee') ? toAddressHex(arg('--dee') as string) : null;
+  const expectAda = arg('--ada') ? toAddressHex(arg('--ada') as string) : null;
   const finishId = arg('--finish');
 
-  const seeded = finishId ? loadMembers(finishId) : [createMember('Ada'), createMember('Bo'), createMember('Cy')];
-  const [ada, bo, cy] = seeded as [Member, Member, Member];
+  const seeded = finishId ? loadMembers(finishId) : [createMember('Bo'), createMember('Cy'), createMember('Dee')];
+  const [bo, cy, dee] = seeded as [Member, Member, Member];
 
   // --- stage 1: the three-way cycle, which needs nobody else --------------
 
@@ -222,17 +227,36 @@ async function main(): Promise<void> {
     log.author(debtor, 'OBLIGATION_ACCEPT', { proposeId: entryId(p), observedHeight });
   };
 
+  /**
+   * An obligation between a seeded member and Ada, who is a bare address because
+   * she joins from the phone. When Ada is the CREDITOR the seeded member is the
+   * debtor and can accept it. When Ada is the DEBTOR only she can accept, so it
+   * stays PROPOSED for her to accept on camera.
+   */
+  const withAda = (member: Member, adaAddress: string, amount: bigint, adaRole: 'debtor' | 'creditor'): void => {
+    const debtorAddress = adaRole === 'debtor' ? adaAddress : member.address;
+    const creditorAddress = adaRole === 'debtor' ? member.address : adaAddress;
+    const p = log.author(member, 'OBLIGATION_PROPOSE', {
+      debtor: debtorAddress,
+      creditor: creditorAddress,
+      amount: amount.toString(),
+    });
+    if (adaRole === 'creditor') {
+      log.author(member, 'OBLIGATION_ACCEPT', { proposeId: entryId(p), observedHeight });
+    }
+  };
+
   if (finishId) {
     const existing = await fetchEntries(relayUrl, finishId);
     log.resume(existing);
   } else {
-  log.author(ada, 'LEDGER_OPEN', { name: 'Lisbon trip' });
-  log.author(bo, 'MEMBER_JOIN', {});
+  log.author(bo, 'LEDGER_OPEN', { name: 'Lisbon trip' });
   log.author(cy, 'MEMBER_JOIN', {});
+  log.author(dee, 'MEMBER_JOIN', {});
 
-  propose(bo, ada, bo.address, 500n * NIM); // Ada owes Bo 500
+  // Both parties are already members, so these can be accepted now.
   propose(cy, bo, cy.address, 500n * NIM); // Bo owes Cy 500
-  propose(ada, cy, ada.address, 500n * NIM); // Cy owes Ada 500
+  propose(dee, bo, dee.address, 300n * NIM); // Bo owes Dee 300
 
   for (const entry of log.entries) validateEntry(entry);
   const stage1 = replayState(log.entries);
@@ -251,12 +275,11 @@ async function main(): Promise<void> {
 
   const inviteUrl = `${origin}/l/${ledgerId}`;
   if (!finishId) {
-  console.log(`\nSeeded "Lisbon trip" with Ada, Bo and Cy as real members.`);
-  console.log(`Their three debts cancel exactly, so right now the tab settles to nothing.\n`);
-  console.log('  Ada owes Bo   500 NIM');
+  console.log(`\nSeeded "Lisbon trip" with Bo, Cy and Dee as real members.`);
+  console.log('Accepted so far:\n');
   console.log('  Bo  owes Cy   500 NIM');
-  console.log('  Cy  owes Ada  500 NIM\n');
-  console.log('Now join as Dee, on your phone, via Discover in Nimiq Pay:\n');
+  console.log('  Bo  owes Dee  300 NIM\n');
+  console.log('Now join as ADA, on your phone, via Discover in Nimiq Pay:\n');
   console.log(`  ${inviteUrl}\n`);
   console.log('Waiting for you to join. Ctrl-C to stop and add the rest later with');
   console.log(`  pnpm seed:demo --finish ${ledgerId}\n`);
@@ -271,16 +294,16 @@ async function main(): Promise<void> {
   // here; the seeder waits for it instead.
 
   const known = new Set(seeded.map((m) => m.address));
-  let dee: string | null = null;
-  for (let i = 0; i < 600 && dee === null; i++) {
+  let ada: string | null = null;
+  for (let i = 0; i < 600 && ada === null; i++) {
     await sleep(2000);
     try {
       const entries = await fetchEntries(relayUrl, ledgerId);
       const st = replayState(entries);
       const joined = st.members.map((m) => m.address).filter((a) => !known.has(a));
-      const match = expectDee ? joined.find((a) => a === expectDee) : joined[0];
+      const match = expectAda ? joined.find((a) => a === expectAda) : joined[0];
       if (match) {
-        dee = match;
+        ada = match;
         log.resume(entries); // continue the chain after Dee's join
       }
     } catch {
@@ -288,11 +311,18 @@ async function main(): Promise<void> {
     }
     if (i % 15 === 14) console.log('  still waiting...');
   }
-  if (dee === null) throw new Error('nobody joined within 20 minutes');
+  if (ada === null) throw new Error('nobody joined within 20 minutes');
 
-  console.log(`\nDee joined as ${dee}. Adding the two debts owed to you.\n`);
-  propose(ada, ada, dee, 1200n * NIM); // Ada owes Dee 1200
-  propose(bo, bo, dee, 300n * NIM); // Bo owes Dee 300
+  console.log(`\nAda joined as ${ada}. Adding the rest.\n`);
+
+  // Cy is the debtor here and Cy is seeded, so this one can be accepted.
+  withAda(cy, ada, 500n * NIM, 'creditor'); // Cy owes Ada 500, accepted by Cy
+
+  // ADA is the debtor on both of these, and only Ada can accept them. They stay
+  // PROPOSED so you accept them on camera. That is the consent model, and it is
+  // what makes the collapse happen live.
+  withAda(bo, ada, 500n * NIM, 'debtor'); // Ada owes Bo 500, awaiting Ada
+  withAda(dee, ada, 1200n * NIM, 'debtor'); // Ada owes Dee 1200, awaiting Ada
 
   const finalEntries = await fetchEntries(relayUrl, ledgerId);
   const merged = [...finalEntries, ...log.entries.filter((e) => !finalEntries.some((f) => entryId(f) === entryId(e)))];
@@ -301,21 +331,27 @@ async function main(): Promise<void> {
     for (const i of state.ignored) console.error(`  ${i.entryType}: ${i.reason}`);
     throw new Error('the seeder produced a log that does not verify');
   }
-  if (state.acceptedPending.length !== 5) {
-    throw new Error(`expected 5 accepted obligations, replay found ${state.acceptedPending.length}`);
+  if (state.acceptedPending.length !== 3) {
+    throw new Error(`expected 3 accepted obligations, replay found ${state.acceptedPending.length}`);
+  }
+  const awaitingAda = state.obligations.filter((o) => o.status === 'PROPOSED' && o.debtor === ada);
+  if (awaitingAda.length !== 2) {
+    throw new Error(`expected 2 obligations awaiting Ada, found ${awaitingAda.length}`);
   }
 
-  const plan = computePlan(
-    state.members.map((m) => m.address),
-    state.acceptedPending.map((o): Obligation => ({ debtor: o.debtor, creditor: o.creditor, amount: o.amount })),
-    'minimal',
-  );
+  // Check the collapse that WILL happen once Ada accepts both, so the seeder
+  // fails here rather than on camera if the numbers do not work out.
+  const afterAdaAccepts: Obligation[] = [
+    ...state.acceptedPending.map((o) => ({ debtor: o.debtor, creditor: o.creditor, amount: o.amount })),
+    ...awaitingAda.map((o) => ({ debtor: o.debtor, creditor: o.creditor, amount: o.amount })),
+  ];
+  const plan = computePlan(state.members.map((m) => m.address), afterAdaAccepts, 'minimal');
   if (plan.transfers.length !== 2) {
     throw new Error(`expected the collapse to produce 2 transfers, got ${plan.transfers.length}`);
   }
-  const deeReceives = plan.transfers.reduce((sum, t) => (t.to === dee ? sum + t.amount : sum), 0n);
-  if (deeReceives !== 1500n * NIM) {
-    throw new Error(`expected Dee to receive 1,500 NIM, the plan gives ${deeReceives} Luna`);
+  const adaPays = plan.transfers.reduce((sum, t) => (t.from === ada ? sum + t.amount : sum), 0n);
+  if (adaPays !== 1200n * NIM) {
+    throw new Error(`expected Ada to pay 1,200 NIM, the plan has her paying ${adaPays} Luna`);
   }
 
   const pending = log.entries.filter((e) => !finalEntries.some((f) => entryId(f) === entryId(e)));
@@ -325,9 +361,13 @@ async function main(): Promise<void> {
 
   const nim = (luna: bigint): string => (luna / NIM).toLocaleString('en-US');
   const nameOf = (addr: string): string =>
-    addr === dee ? 'You (Dee)' : (seeded.find((m) => m.address === addr)?.name ?? addr.slice(0, 8));
+    addr === ada ? 'You (Ada)' : (seeded.find((m) => m.address === addr)?.name ?? addr.slice(0, 8));
 
-  console.log('Five obligations, all accepted, collapse to two transfers');
+  console.log('Waiting for you to accept, this is the demo beat:');
+  for (const o of awaitingAda) {
+    console.log(`  You owe ${nameOf(o.creditor).padEnd(9)} ${nim(o.amount).padStart(5)} NIM`);
+  }
+  console.log('\nOnce you accept both, five obligations collapse to two transfers');
   for (const t of plan.transfers) {
     console.log(`  ${nameOf(t.from).padEnd(9)} -> ${nameOf(t.to).padEnd(9)} ${nim(t.amount).padStart(5)} NIM`);
   }
@@ -337,6 +377,7 @@ async function main(): Promise<void> {
     }
   }
   console.log(`\nReload the tab on your phone:\n\n  ${inviteUrl}\n`);
+  console.log('You pay Dee 1,200 with no dialog. That is the mechanic, on camera.\n');
 }
 
 main().catch((err: unknown) => {

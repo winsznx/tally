@@ -76,6 +76,8 @@ export interface LedgerViewModel {
   /** The settlement preview if a round opened now (deterministic). */
   preview: SettlementPlan | null;
   openRound: RoundView | null;
+  /** My account address when I am a member, so the UI can spot my own legs. */
+  myAddressForSettle: string | null;
   /** Entries that failed contextual checks (surfaced for debugging/transparency). */
   ignoredCount: number;
 }
@@ -160,6 +162,7 @@ export function deriveViewModel(input: DeriveInput): LedgerViewModel {
     openRound: state.openRound
       ? deriveRoundView(state, input)
       : null,
+    myAddressForSettle: input.myAddress,
     ignoredCount: state.ignored.length,
   };
 }
