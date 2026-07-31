@@ -5,6 +5,8 @@ import { createBindingAttestation } from '../binding/index.js';
 import {
   LogError,
   TallyLog,
+  derivedAnchorHeight,
+  deterministicNonce,
   entryId,
   findDivergence,
   obligationLogRoot,
@@ -58,11 +60,18 @@ function makeEntry(
     const att = createBindingAttestation(m.account, pursePk(m));
     full = { ...payload, accountPublicKey: att.accountPublicKey, bindingSignature: att.bindingSignature };
   }
+  if (entryType === 'OBLIGATION_ACCEPT' && !('observedHeight' in payload)) {
+    full = { ...full, observedHeight: ACCEPT_HEIGHT };
+  }
   return signEntry(
     { prevEntryHash, entryType, payload: full, authorAddress: addr(m), pursePublicKey: pursePk(m), nonce, logicalClock },
     m.purse,
   );
 }
+
+// Default observed height for accepts in tests; ROUND_OPEN anchor height is
+// derived from the consumed accepts, so single-accept rounds open at this value.
+const ACCEPT_HEIGHT = 41200;
 
 const stringify = (v: unknown): string =>
   JSON.stringify(v, (_k, x) => (typeof x === 'bigint' ? `${x}n` : x));
@@ -426,6 +435,56 @@ describe('rounds', () => {
     expect(state.ignored.some((i) => i.entryType === 'ROUND_EXPIRE' && i.reason.includes('purse key'))).toBe(true);
   });
 
+  it('GAP 1: same account on three devices emits an identical ROUND_OPEN, exactly one survives replay', () => {
+    // Two accepts observed at DIFFERENT heights (1000 vs 1003 — the fork risk).
+    const { log, proposeId } = basicLedger(); // bob owes alice 500
+    log.append(makeEntry(carol, 'MEMBER_JOIN', {}, log.headHash, 3));
+    const p2 = makeEntry(
+      bob,
+      'OBLIGATION_PROPOSE',
+      { debtor: addr(carol), creditor: addr(bob), amount: '300' },
+      log.headHash,
+      4,
+    );
+    log.append(p2);
+    log.append(makeEntry(bob, 'OBLIGATION_ACCEPT', { proposeId, observedHeight: 1000 }, log.headHash, 5));
+    log.append(makeEntry(carol, 'OBLIGATION_ACCEPT', { proposeId: entryId(p2), observedHeight: 1003 }, log.headHash, 6));
+
+    const head = log.headHash;
+    const consumed = log.replay().obligations.filter((o) => o.status === 'ACCEPTED');
+    const anchor = derivedAnchorHeight(consumed);
+    expect(anchor).toBe(1003); // latest accept by (clock, id) — never each device's own view
+
+    // alice (the settler) on three devices builds the SAME ROUND_OPEN: derived
+    // height + content-derived nonce ⇒ byte-identical ⇒ collapses on entry ID.
+    const roundPayload = { round: 1, anchorHeight: anchor, mode: 'minimal' as const };
+    const nonce = deterministicNonce('ROUND_OPEN', roundPayload);
+    const device = (): LogEntry => makeEntry(alice, 'ROUND_OPEN', roundPayload, head, 7, nonce);
+    const d1 = device();
+    const d2 = device();
+    const d3 = device();
+    expect(new Set([d1, d2, d3].map(entryId)).size).toBe(1); // exactly one distinct entry
+
+    const merged = replayState([...log.all(), d1, d2, d3]);
+    expect(merged.openRound).toMatchObject({ round: 1, anchorHeight: 1003 });
+  });
+
+  it('rejects a ROUND_OPEN whose anchorHeight is not the log-derived height (would fork)', () => {
+    const { log } = ledgerWithAccepted();
+    log.append(makeEntry(alice, 'ROUND_OPEN', { round: 1, anchorHeight: ACCEPT_HEIGHT + 3, mode: 'minimal' }, log.headHash, 4));
+    const state = log.replay();
+    expect(state.openRound).toBeNull();
+    expect(state.ignored.some((i) => i.entryType === 'ROUND_OPEN' && i.reason.includes('log-derived'))).toBe(true);
+  });
+
+  it('refuses to open a round with no accepted obligations', () => {
+    const { log } = basicLedger();
+    log.append(makeEntry(alice, 'ROUND_OPEN', { round: 1, anchorHeight: ACCEPT_HEIGHT, mode: 'minimal' }, log.headHash, 3));
+    const state = log.replay();
+    expect(state.openRound).toBeNull();
+    expect(state.ignored.some((i) => i.reason.includes('no accepted obligations'))).toBe(true);
+  });
+
   it('rejects a ROUND_OPEN anchorHeight above the u32 ceiling at the payload boundary', () => {
     const { log } = ledgerWithAccepted();
     expect(() =>
@@ -435,9 +494,9 @@ describe('rounds', () => {
 
   it('rounds must open in sequence and never concurrently', () => {
     const { log } = ledgerWithAccepted();
-    log.append(makeEntry(alice, 'ROUND_OPEN', { round: 5, anchorHeight: 100, mode: 'minimal' }, log.headHash, 4));
-    log.append(makeEntry(alice, 'ROUND_OPEN', { round: 1, anchorHeight: 100, mode: 'minimal' }, log.headHash, 5));
-    log.append(makeEntry(bob, 'ROUND_OPEN', { round: 2, anchorHeight: 200, mode: 'minimal' }, log.headHash, 6));
+    log.append(makeEntry(alice, 'ROUND_OPEN', { round: 5, anchorHeight: ACCEPT_HEIGHT, mode: 'minimal' }, log.headHash, 4));
+    log.append(makeEntry(alice, 'ROUND_OPEN', { round: 1, anchorHeight: ACCEPT_HEIGHT, mode: 'minimal' }, log.headHash, 5));
+    log.append(makeEntry(bob, 'ROUND_OPEN', { round: 2, anchorHeight: ACCEPT_HEIGHT, mode: 'minimal' }, log.headHash, 6));
     const state = log.replay();
     expect(state.openRound?.round).toBe(1);
     expect(state.ignored.filter((i) => i.entryType === 'ROUND_OPEN')).toHaveLength(2);

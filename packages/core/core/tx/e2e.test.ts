@@ -44,6 +44,9 @@ function makeEntry(
     const att = createBindingAttestation(kp, pk(kp));
     full = { ...payload, accountPublicKey: att.accountPublicKey, bindingSignature: att.bindingSignature };
   }
+  if (entryType === 'OBLIGATION_ACCEPT' && !('observedHeight' in payload)) {
+    full = { ...full, observedHeight: 41_200 };
+  }
   return signEntry(
     {
       prevEntryHash,

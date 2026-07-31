@@ -125,6 +125,19 @@ export function entryHash(entry: LogEntry): string {
   );
 }
 
+/**
+ * A content-derived 16-byte nonce for entries that must COLLAPSE across devices
+ * rather than merely avoid forking — ROUND_OPEN and ROUND_EXPIRE. Because the
+ * entry ID covers the nonce, a random nonce would make two devices' otherwise
+ * identical round entries distinct; deriving the nonce from the content makes
+ * them byte-identical so they dedupe on entry ID (GAP 1). User-initiated entries
+ * (propose/accept/reject) use a random nonce — they are genuinely distinct acts.
+ */
+export function deterministicNonce(entryType: EntryType, payload: Record<string, unknown>): string {
+  const digest = Hash.computeBlake2b(concatBytes(utf8(entryType), utf8(canonicalJson(payload))));
+  return bytesToHex(digest.slice(0, 16));
+}
+
 export function signEntry(unsigned: Omit<LogEntry, 'purseSignature'>, keyPair: KeyPair): LogEntry {
   validateUnsigned(unsigned);
   const expectedPk = bytesToHex(keyPair.publicKey.serialize());
@@ -199,12 +212,21 @@ function validatePayload(entryType: EntryType, payload: Record<string, unknown>)
       if ('memo' in payload && typeof payload['memo'] !== 'string') throw new LogError('PROPOSE: memo must be a string');
       return;
     }
-    case 'OBLIGATION_ACCEPT':
-      expect(['proposeId'], ['proposeId']);
+    case 'OBLIGATION_ACCEPT': {
+      // observedHeight is the block height the accepting device saw when it
+      // signed. It is recorded permanently so ROUND_OPEN can DERIVE its anchor
+      // height from the log (GAP 1) rather than observing it at open time —
+      // otherwise two devices opening a round at different heights fork the log.
+      expect(['proposeId', 'observedHeight'], ['proposeId', 'observedHeight']);
       if (typeof payload['proposeId'] !== 'string' || !HASH_RE.test(payload['proposeId'])) {
         throw new LogError('ACCEPT: proposeId must be a 32-byte entry ID hex');
       }
+      const h = payload['observedHeight'];
+      if (typeof h !== 'number' || !Number.isSafeInteger(h) || h < 1 || h > MAX_ANCHOR_HEIGHT) {
+        throw new LogError(`ACCEPT: observedHeight must be an integer in 1..${MAX_ANCHOR_HEIGHT}`);
+      }
       return;
+    }
     case 'OBLIGATION_REJECT':
       expect(['proposeId', 'reason'], ['proposeId']);
       if (typeof payload['proposeId'] !== 'string' || !HASH_RE.test(payload['proposeId'])) {
@@ -267,6 +289,36 @@ export function validateEntry(entry: LogEntry): void {
 
 export type ObligationStatus = 'PROPOSED' | 'ACCEPTED' | 'CONTESTED' | 'IN_ROUND';
 
+/** Minimal accept facts needed to derive a round's anchor height (GAP 1). */
+export interface AcceptedHeightRef {
+  acceptId: string | null;
+  acceptObservedHeight: number | null;
+  acceptClock: number | null;
+}
+
+/**
+ * The log-derived anchor height for a round: the observedHeight recorded on the
+ * canonically-latest consumed accept (max by (acceptClock, acceptId)). Pure and
+ * order-independent, so every device building a ROUND_OPEN from the same
+ * accepted set produces the identical height — and thus identical bytes.
+ * The app must use this to construct ROUND_OPEN; replay rejects any other value.
+ */
+export function derivedAnchorHeight(consumed: readonly AcceptedHeightRef[]): number {
+  let bestId: string | null = null;
+  let bestClock = -1;
+  let bestHeight = -1;
+  for (const ob of consumed) {
+    if (ob.acceptObservedHeight === null || ob.acceptClock === null || ob.acceptId === null) continue;
+    if (bestId === null || ob.acceptClock > bestClock || (ob.acceptClock === bestClock && ob.acceptId > bestId)) {
+      bestId = ob.acceptId;
+      bestClock = ob.acceptClock;
+      bestHeight = ob.acceptObservedHeight;
+    }
+  }
+  if (bestId === null) throw new LogError('cannot derive anchor height: no accepted obligation with a recorded height');
+  return bestHeight;
+}
+
 export interface ObligationRecord {
   proposeId: string;
   debtor: AddressHex;
@@ -275,6 +327,10 @@ export interface ObligationRecord {
   memo: string | null;
   status: ObligationStatus;
   acceptId: string | null;
+  /** Block height recorded on the accepting entry, or null if not yet accepted. */
+  acceptObservedHeight: number | null;
+  /** logicalClock of the accepting entry, for deterministic anchor-height derivation. */
+  acceptClock: number | null;
   /** Round that consumed this obligation, if any. */
   round: number | null;
 }
@@ -431,6 +487,8 @@ export function replayState(entries: LogEntry[]): LedgerState {
           memo: (e.payload['memo'] as string | undefined) ?? null,
           status: 'PROPOSED',
           acceptId: null,
+          acceptObservedHeight: null,
+          acceptClock: null,
           round: null,
         });
         break;
@@ -451,6 +509,8 @@ export function replayState(entries: LogEntry[]): LedgerState {
         }
         ob.status = 'ACCEPTED';
         ob.acceptId = s.id;
+        ob.acceptObservedHeight = e.payload['observedHeight'] as number;
+        ob.acceptClock = e.logicalClock;
         acceptIdByPropose.set(ob.proposeId, s.id);
         break;
       }
@@ -488,13 +548,28 @@ export function replayState(entries: LogEntry[]): LedgerState {
         const consumed = [...obligations.values()]
           .filter((ob) => ob.status === 'ACCEPTED')
           .sort((a, b) => (a.proposeId < b.proposeId ? -1 : 1));
+        if (consumed.length === 0) {
+          skip(s, 'round has no accepted obligations to settle');
+          break;
+        }
+        // GAP 1: the anchor height is DERIVED from the log — the observedHeight
+        // of the canonically-latest consumed accept (max (acceptClock, acceptId)).
+        // Every device computes the same value, so a ROUND_OPEN's content is
+        // byte-identical and duplicates collapse on entry ID. A ROUND_OPEN whose
+        // anchorHeight is not this derived value is rejected, which is what stops
+        // an observed-at-open height from forking the log.
+        const expectedAnchorHeight = derivedAnchorHeight(consumed);
+        if ((e.payload['anchorHeight'] as number) !== expectedAnchorHeight) {
+          skip(s, `anchorHeight ${e.payload['anchorHeight']} is not the log-derived height ${expectedAnchorHeight}`);
+          break;
+        }
         for (const ob of consumed) {
           ob.status = 'IN_ROUND';
           ob.round = round;
         }
         openRound = {
           round,
-          anchorHeight: e.payload['anchorHeight'] as number,
+          anchorHeight: expectedAnchorHeight,
           mode: e.payload['mode'] as NettingMode,
           consumedAcceptIds: consumed.map((ob) => ob.acceptId as string).sort(),
           consumedProposeIds: consumed.map((ob) => ob.proposeId),
