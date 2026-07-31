@@ -6,17 +6,26 @@
   "license": "MIT",
   "type": "module",
   "packageManager": "pnpm@10.33.0",
-  "repository": { "type": "git", "url": "git+https://github.com/winsznx/tally.git" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/winsznx/tally.git"
+  },
   "homepage": "https://github.com/winsznx/tally#readme",
-  "bugs": { "url": "https://github.com/winsznx/tally/issues" },
+  "bugs": {
+    "url": "https://github.com/winsznx/tally/issues"
+  },
   "scripts": {
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",
-    "build": "pnpm -r build"
+    "build": "pnpm -r build",
+    "seed:demo": "tsx scripts/seed-demo.ts"
   },
   "devDependencies": {
+    "@nimiq/core": "^2.7.2",
+    "@tally/core": "workspace:*",
     "@types/node": "^24.0.0",
     "fast-check": "^3.19.0",
+    "tsx": "^4.19.0",
     "typescript": "^5.5.0",
     "vitest": "^2.1.0"
   }

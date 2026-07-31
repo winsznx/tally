@@ -1,113 +1,149 @@
 # Tally
 
-**Top up once. Stop settling up.**
+Keep a running tab with your people, and stop approving payments.
 
-A shared ledger of obligations among 2–12 people that nets continuously, clears
-in NIM without a payment prompt per transfer, and anchors every settlement to an
-append-only on-chain record. Built for the Nimiq Pay Mini Apps competition.
+**[Live demo](https://tally-646.pages.dev)** · [Architecture](ARCHITECTURE.md) · [Decisions](DECISIONS.md) · [Security](SECURITY.md) · [Reviews](REVIEWS.md)
 
-> Testnet only in development. Public from the first commit — all history is
-> public. MIT licensed.
+A Nimiq Pay Mini App. Testnet.
+
+## The problem
+
+Bill splitting apps produce a list saying X owes Y 2,400, and then nothing happens. The debt sits there. Nobody pays, because moving small amounts costs fees, takes minutes, and needs everyone online on the same rail at once.
+
+The tracking was never the problem. The settling is.
+
+## What Tally does
+
+It takes a graph of who owes whom, computes the smallest set of transfers that clears it, and executes them without asking for a confirmation per payment.
+
+Four friends, five debts, from the PRD's worked example:
+
+```
+Ada owes Bo    500        Ada owes Dee  1200
+Bo  owes Cy    500        Bo  owes Dee   300
+Cy  owes Ada   500
+```
+
+Ada, Bo and Cy owe each other in a circle. That circle cancels exactly, and no money moves for it. What's left:
+
+```
+Ada  ->  Dee   1200
+Bo   ->  Dee    300
+```
+
+Five obligations become two transfers, and Cy nets to zero and drops out of the round entirely, so Cy never opens the app at all. That second effect is what a transfer count hides: netting reduces how many people have to show up, not just how many payments happen.
+
+`pnpm --filter @tally/core test` covers this exact example as a fixed regression, asserting two transfers and Cy's absence.
+
+## Why this only works on Nimiq
+
+Auto-settling small amounts on a fee-bearing chain means holding a gas token and pre-approving spends before anything can move on your behalf. Ask someone to keep POL topped up so their share of dinner settles itself and you've lost them. The mechanic doesn't survive contact with gas.
+
+Nimiq transfers are feeless, so clearing a 3 NIM debt is worth doing at all. Where the fee exceeds the debt, small automatic settlement is pointless, which is why nobody builds it there.
+
+Anchoring is free too. Each settlement transfer carries its round's commitment in its own 64-byte data field, so the audit trail rides along with the payment instead of costing a second transaction.
+
+We considered settling in USDT and rejected it. Gas kills the premise, and asking a non-crypto person to hold two tokens to split a taxi fare is worse than the problem. That's a design position, not an omission. [DECISIONS.md](DECISIONS.md) lists everything rejected and why.
 
 ## How it works
 
-```mermaid
-flowchart LR
-    A["Obligation added"] --> B["Debtor accepts (1 tap, 0 dialogs)"]
-    B --> C["Graph re-nets"]
-    C --> D{"Trigger?"}
-    D -->|no| A
-    D -->|yes| E["Round opens"]
-    E --> F["Purses pay (0 dialogs)"]
-    F --> G["Anchor lands on-chain"]
-    G --> A
-```
+### The purse
 
-Three mechanisms carry the product:
-
-- **Netting** collapses pairwise debts, cancels cycles exactly, then greedily
-  matches largest debtor to largest creditor — at most n−1 transfers, computed
-  identically on every device. Whoever nets to zero drops out of the round.
-- **The purse** is a session key derived from one wallet signature. It signs the
-  log (every mode) and, once funded, pays settlements with no dialog (auto
-  mode). It is a disclosed hot key — see [SECURITY.md](SECURITY.md).
-- **Anchoring** rides a 50-byte commitment in each settlement's data field, a
-  hash chain so rewriting any past obligation breaks every anchor after it.
-
-## Monorepo
-
-| Package | What it is | Status |
-| --- | --- | --- |
-| [`packages/core`](packages/core) | Pure engine: netting, anchor, signed log, deterministic tx, purse↔account binding. Zero DOM/network/wallet. | ✅ built, 82 tests, reviewed |
-| [`packages/relay`](packages/relay) | Untrusted log transport (Cloudflare Workers + D1). | ✅ built, 8 tests, reviewed |
-| [`packages/app`](packages/app) | Mini app + landing, one origin. | 🚧 shell + state layer + landing built (20 tests); full flow UI in progress |
-
-## The two things that make it work
-
-**Determinism is the product.** Two devices holding the same obligation set
-produce byte-identical plans and transactions, so a duplicate broadcast is a
-mempool re-broadcast — not a second payment. The round's anchor height is
-derived from the log (never observed at open time), or two devices would fork.
-
-**The relay is untrusted.**
+At setup the user signs one message with their Nimiq Pay key. That signature is the attestation binding an app-generated key, the purse, to their real account.
 
 ```mermaid
-flowchart LR
-    D1["Device A"] <-->|signed entries| R["Relay (untrusted)"]
-    D2["Device B"] <-->|signed entries| R
-    D1 -->|re-verifies everything| D1
-    D2 -->|re-verifies everything| D2
-    D1 -->|settlement carries the root| C["Nimiq chain"]
-    D2 -->|reads the anchor| C
+sequenceDiagram
+    actor U as User
+    participant T as Tally
+    participant P as Nimiq Pay
+    participant C as Nimiq chain
+
+    U->>T: Enable auto-settle
+    T->>T: generate purse keypair
+    T->>P: sign binding message naming the purse
+    P->>U: Approval dialog 1 of 2
+    U-->>P: Approve
+    U->>T: Top up the purse
+    T->>P: sendBasicTransaction to purse address
+    P->>U: Approval dialog 2 of 2
+    Note over T,C: From here the purse acts alone.
 ```
 
-It can omit, reorder, or go down; it cannot forge. Every entry is signed by a
-purse key bound to a real account (verified by the [binding
-attestation](packages/core/core/binding)), and clients re-verify every entry.
+The purse has two jobs. It signs log entries, which every mode uses and which risks nothing. It also holds NIM and broadcasts settlements with no dialog, which only auto-settle mode uses. Manual mode disables the second job only: same netting, same anchoring, same audit trail, one dialog per payment. Skipping the purse costs taps, not features.
 
-## Development
+The binding proves which account a purse speaks for, and replay rejects any member whose attestation doesn't verify.
+
+### The netting engine
+
+```mermaid
+flowchart TD
+    A["Accepted obligations"] --> B["Pairwise collapse"]
+    B --> C["Cycle cancellation"]
+    C --> D["Net positions<br/>sum must be zero"]
+    D --> E["Greedy minimisation"]
+    E --> F["At most n-1 transfers"]
+```
+
+Cycle cancellation is exact, and removes debt without moving money. The zero-sum check runs on every execution in production, not just in tests. Greedy minimisation matches the largest debtor to the largest creditor directly, so every transfer goes debtor to creditor with no intermediary hops, and nobody's payment waits on a third person.
+
+### The anchor chain
+
+Each round's commitment chains to the one before it:
+
+```mermaid
+flowchart LR
+    Z["root 0"] --> H1{{"Blake2b"}}
+    L1["obligation log root"] --> H1
+    P1["settlement plan"] --> H1
+    H1 --> R1["root 1"]
+    R1 --> H2{{"Blake2b"}}
+    L2["log root 2"] --> H2
+    P2["plan 2"] --> H2
+    H2 --> R2["root 2"]
+    R1 -.->|"rides in round 1 transfers"| T1["on-chain"]
+    R2 -.->|"rides in round 2 transfers"| T2["on-chain"]
+```
+
+Change one obligation in round 1 and root 1 changes, which changes every root after it. Those roots already sit in transfers that already settled and can't be recalled. Tally's backend can't quietly revise what you owed last month, because the money that already moved commits to the old history.
+
+## What it doesn't do
+
+**Nothing runs while the app is closed.** Mini apps have no background worker, no push channel, and no hosted signer. A purse is live only while Tally is open, so settlement happens when you open the app, not on a schedule. Any copy suggesting otherwise would be false.
+
+**Verification needs the exported log.** Anchors prove a round's transfers are complete, correctly indexed and consistent with a committed plan. They can't prove the obligations behind them were real. A full audit needs the signed log alongside the chain data, which any member can export.
+
+**The purse is a hot key.** It lives in WebView storage, and its balance is the entire security boundary. That bound is protocol-level and absolute. It's a cash drawer, not a vault, and the app says so before anyone funds it.
+
+**The chain proves settlement, not truth.** It shows money moved between specific addresses in a pattern matching a committed plan. It can't show dinner happened or that the split was fair.
+
+**Nobody can be forced to settle.** With no contract enforcement available, a member who never funds their purse simply doesn't pay. What Tally produces is permanent, public, attributable evidence of who didn't. That's social pressure, and calling it stronger would be dishonest.
+
+## Running it
+
+Needs Node 20+ and pnpm.
 
 ```sh
 pnpm install
-pnpm -r test        # vitest + fast-check
+pnpm -r test          # vitest + fast-check
 pnpm -r typecheck
-pnpm --filter @tally/app dev     # one origin; ?app=1 forces the app half
+pnpm --filter @tally/app dev     # one origin, ?app=1 forces the app half
 pnpm --filter @tally/relay dev   # the relay
 ```
 
-## Deploying
+Deploying to Cloudflare is `npx wrangler login` then `./scripts/deploy.sh`. See [DEPLOY.md](DEPLOY.md). There are no secrets in this repository and none are needed, which is a deliberate property explained there.
 
-Everything runs on Cloudflare — Pages for the origin, Workers + D1 for the
-relay. From a clean checkout:
+To record a demo without recruiting three people, `pnpm seed:demo --dee <your address>` creates Ada, Bo and Cy as real cryptographic members with the obligations above, and prints an invite link.
 
-```sh
-npx wrangler login      # the only interactive step
-./scripts/deploy.sh     # everything else, idempotent
-```
+## Repo map
 
-Full details in [DEPLOY.md](DEPLOY.md).
+| Package | What it owns | Why it exists |
+| --- | --- | --- |
+| `packages/core` | Netting, anchor format, signed log, deterministic transactions, binding attestation | Pure modules with no DOM and no network, so the rules that move money are testable without a phone |
+| `packages/app` | Mini app, landing page, adapters, screens | One origin serves both halves. External dependencies sit behind interfaces so flows run against fakes |
+| `packages/relay` | Cloudflare Worker plus D1 | Stores and forwards signed entries. Untrusted by design: it can omit, reorder or go down, and it cannot forge |
 
-**There are no secrets in this repository, and none are needed.** No keys, no
-tokens, no `.env`. That is a deliberate property: the relay holds only signed
-public entries and is untrusted by design, the purse key is generated at runtime
-on the device and never leaves it, and the D1 database id is an account-scoped
-resource handle rather than a credential. Endpoints are injected at build time
-(`VITE_RELAY_URL`) so a preview build can point at a preview relay — not because
-they are sensitive.
+## Documents
 
-## Ground rules
+[ARCHITECTURE.md](ARCHITECTURE.md) for the engineering. [DECISIONS.md](DECISIONS.md) for what was rejected. [SECURITY.md](SECURITY.md) for the threat model. [REVIEWS.md](REVIEWS.md) for the bugs adversarial review found. [DEPLOY.md](DEPLOY.md) to ship it.
 
-- **Testnet only** until release; both networks at submission. Ledgers are
-  network-scoped.
-- **BigInt Luna everywhere** (1 NIM = 100,000 Luna). A float touching an amount
-  is a bug.
-- **Everything degrades to something usable, never a blank screen.** Declined
-  dialog, dead relay, lost consensus, rate limit — each has a designed state.
-
-## Honest limitations
-
-See [SECURITY.md](SECURITY.md) for the full security model. In short: the purse
-is a disclosed hot key whose balance is the entire risk; on-chain anchors prove
-internal consistency and prevent silent rewrites but need the exported signed
-log for full audit; nobody can be forced to settle; and member registration is
-trust-on-first-use ([issue #1](https://github.com/winsznx/tally/issues/1)).
+MIT licensed.

@@ -8,12 +8,21 @@ importers:
 
   .:
     devDependencies:
+      '@nimiq/core':
+        specifier: ^2.7.2
+        version: 2.7.2(vite@5.4.21(@types/node@24.13.3))
+      '@tally/core':
+        specifier: workspace:*
+        version: link:packages/core
       '@types/node':
         specifier: ^24.0.0
         version: 24.13.3
       fast-check:
         specifier: ^3.19.0
         version: 3.23.2
+      tsx:
+        specifier: ^4.19.0
+        version: 4.23.1
       typescript:
         specifier: ^5.5.0
         version: 5.9.3
@@ -1138,6 +1147,11 @@ packages:
   tslib@2.8.1:
     resolution: {integrity: sha512-oJFu94HQb+KVduSUQL7wnpmqnfmLsOA/nAh6b6EH0wCEoK0/mPeXU6c3wKDV83MkOuHPRHtSXKKU99IBazS/2w==}
 
+  tsx@4.23.1:
+    resolution: {integrity: sha512-GQHnkIfxyx1wYCOS/wonik5MVRZU9hi1TEZmzGZSCJB1y9YgoZ8H6itNE/u4suE+yLmOzuE4E5S4TZ/ZX2wcWQ==}
+    engines: {node: '>=18.0.0'}
+    hasBin: true
+
   type@2.7.3:
     resolution: {integrity: sha512-8j+1QmAbPvLZow5Qpi6NCaN8FB60p/6x8/vfNqOk/hC+HuvFZhL4+WfekuhQLiqFZXOgQdrs3B+XxEmCc6b3FQ==}
 
@@ -2083,6 +2097,12 @@ snapshots:
 
   tslib@2.8.1:
     optional: true
+
+  tsx@4.23.1:
+    dependencies:
+      esbuild: 0.28.1
+    optionalDependencies:
+      fsevents: 2.3.3
 
   type@2.7.3: {}
 

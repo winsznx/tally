@@ -11,7 +11,7 @@ npx wrangler login      # the only interactive step
 ./scripts/deploy.sh     # everything else
 ```
 
-That script is idempotent — re-run it to redeploy. It:
+That script is idempotent, re-run it to redeploy. It:
 
 1. installs dependencies and runs the full test suite (a failing build never ships),
 2. creates the D1 database if it does not exist and writes its id into
@@ -29,15 +29,14 @@ It prints the app URL, the relay URL, and the `/stats` endpoint at the end.
 no tokens, no `.env` file, no `wrangler secret put`. This is a deliberate
 property of the architecture, not an oversight:
 
-- The relay stores only **signed public entries** and is **untrusted by design**
-  — clients re-verify every entry, so a leaked copy of its database would reveal
+- The relay stores only **signed public entries** and is **untrusted by design**, clients re-verify every entry, so a leaked copy of its database would reveal
   nothing that is not already public on-chain, and grant no ability to forge.
 - The purse key is **generated at runtime on the device** and never leaves it or
   enters this repository.
 - The D1 `database_id` in `wrangler.toml` is an account-scoped **resource
   handle**, not a credential: it is useless without your Cloudflare login.
 - Endpoints (relay, public RPC) are public URLs, injected at build time so they
-  can vary per environment — not because they are sensitive.
+  can vary per environment, not because they are sensitive.
 
 The only credential involved anywhere is your own `wrangler login`, which lives
 in your local Cloudflare config and never touches the repo.
@@ -83,10 +82,22 @@ pnpm --filter @tally/app dev       # origin on http://localhost:5174
 
 ## Verifying a deploy
 
+The live deployment from this repo:
+
+| | |
+| --- | --- |
+| App and landing | https://tally-646.pages.dev |
+| Relay | https://tally-relay.timjosh507.workers.dev |
+| Unique members | https://tally-relay.timjosh507.workers.dev/stats |
+
+Cloudflare appends a suffix to the subdomain when the name is taken, so the
+project is `tally` but it serves from `tally-646.pages.dev`. The deploy script
+derives the stable alias from the deploy output rather than assuming they match.
+
 | Check | Expectation |
 | --- | --- |
 | Open the Pages URL on desktop | The **landing page** renders (no `window.nimiqPay`). |
 | Open `<pages-url>/?app=1` | The **mini app** half renders instead. |
-| Open `<pages-url>/l/<anything>` | Still the app shell — the SPA rewrite works, invite links resolve. |
+| Open `<pages-url>/l/<anything>` | Still the app shell, the SPA rewrite works, invite links resolve. |
 | `curl <relay-url>/stats` | `{"uniqueAccounts":0}` |
 | Nimiq Pay → Mini Apps → Custom URL → Pages URL | The mini app loads over HTTPS (a secure context, so `crypto.randomUUID` is available). |

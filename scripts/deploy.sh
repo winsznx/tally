@@ -88,10 +88,12 @@ say "Deploying the app to Cloudflare Pages"
 $WRANGLER pages project create "$PAGES_PROJECT" --production-branch main 2>/dev/null || true
 PAGES_OUT="$($WRANGLER pages deploy "$APP_DIR/dist" --project-name "$PAGES_PROJECT" --branch main 2>&1)"
 echo "$PAGES_OUT"
-# Prefer the STABLE alias (https://<project>.pages.dev) over the per-deployment
-# preview URL, which changes every deploy and is useless as a Demo URL.
-PAGES_URL="$(printf '%s' "$PAGES_OUT" | grep -oE "https://${PAGES_PROJECT}\\.pages\\.dev" | head -1)"
-if [ -z "$PAGES_URL" ]; then PAGES_URL="https://${PAGES_PROJECT}.pages.dev"; fi
+# Prefer the STABLE alias over the per-deployment preview URL, which changes
+# every deploy and is useless as a Demo URL. Cloudflare may append a suffix to
+# the subdomain if the name is taken (tally -> tally-646.pages.dev), so derive
+# the alias by stripping the deployment hash rather than assuming the project
+# name matches the subdomain.
+PAGES_URL="$(printf '%s' "$PAGES_OUT" | grep -oE 'https://[a-zA-Z0-9.-]+\.pages\.dev' | tail -1 | sed -E 's#https://[0-9a-f]{6,}\.#https://#')"
 
 say "Done"
 echo "  App:   ${PAGES_URL:-see output above}"
