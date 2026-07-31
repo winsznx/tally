@@ -1,6 +1,6 @@
-import { KeyPair, PrivateKey } from '@nimiq/core';
+import { KeyPair, PrivateKey, PublicKey } from '@nimiq/core';
 import { describe, expect, it } from 'vitest';
-import { bytesToHex } from '../internal/bytes.js';
+import { bytesToHex, hexToBytes } from '../internal/bytes.js';
 import { createBindingAttestation } from '../binding/index.js';
 import {
   LogError,
@@ -273,6 +273,32 @@ describe('binding attestation at registration', () => {
     const state = log.replay();
     expect(state.members.map((m) => m.address)).toEqual([addr(alice)]);
     expect(state.ignored.some((i) => i.entryType === 'MEMBER_JOIN' && i.reason.includes('binding'))).toBe(true);
+  });
+
+  it('rejects a phantom MEMBER_JOIN forged with a small-order account key (cofactored-verify attack)', () => {
+    const log = new TallyLog();
+    log.append(makeEntry(alice, 'LEDGER_OPEN', { name: 'x' }, null, 0));
+    // Identity account key + zero binding signature would pass a cofactored verify.
+    // authorAddress is the identity point's derived address; the entry is validly
+    // signed by the attacker's own purse. Replay must refuse to register it.
+    const identityPk = '01' + '00'.repeat(31);
+    const identityAddr = bytesToHex(PublicKey.deserialize(hexToBytes(identityPk)).toAddress().serialize());
+    const phantom = signEntry(
+      {
+        prevEntryHash: log.headHash,
+        entryType: 'MEMBER_JOIN',
+        payload: { accountPublicKey: identityPk, bindingSignature: '00'.repeat(64) },
+        authorAddress: identityAddr,
+        pursePublicKey: pursePk(mallory),
+        nonce: nextNonce(),
+        logicalClock: 1,
+      },
+      mallory.purse,
+    );
+    log.append(phantom);
+    const state = log.replay();
+    expect(state.members.map((m) => m.address)).toEqual([addr(alice)]);
+    expect(state.ignored.some((i) => i.reason.includes('binding'))).toBe(true);
   });
 
   it('rejects a binding replayed from another ledger onto a different purse', () => {

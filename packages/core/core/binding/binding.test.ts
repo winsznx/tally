@@ -1,6 +1,6 @@
-import { KeyPair, PrivateKey } from '@nimiq/core';
+import { KeyPair, PrivateKey, PublicKey } from '@nimiq/core';
 import { describe, expect, it } from 'vitest';
-import { bytesToHex } from '../internal/bytes.js';
+import { bytesToHex, hexToBytes } from '../internal/bytes.js';
 import {
   bindingMessage,
   createBindingAttestation,
@@ -65,6 +65,27 @@ describe('binding attestation', () => {
     const attackerPurseHex = bytesToHex(attacker.publicKey.serialize());
     const replayed: BindingAttestation = { ...real, pursePublicKey: attackerPurseHex };
     expect(verifyBindingAttestation(replayed)).toBe(false);
+  });
+
+  it('rejects small-order / identity account public keys (cofactored-verify forgery)', () => {
+    // @nimiq/core verifies with the cofactored equation, so a small-order account
+    // key validates a forged signature over any message. All must be rejected.
+    const zeroSig = '00'.repeat(64);
+    const smallOrderKeys = [
+      '01' + '00'.repeat(31), // Ed25519 identity (y = 1)
+      '00'.repeat(31) + '80', // non-canonical identity (y = 0, high bit set)
+      'ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff', // p-1 (high bit set)
+      'edffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f', // p, sign bit clear
+      '26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc85', // order-8, non-canonical high bit
+      'c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac037a', // order-8
+    ];
+    for (const pk of smallOrderKeys) {
+      const addr = bytesToHex(PublicKey.deserialize(hexToBytes(pk)).toAddress().serialize());
+      expect(
+        verifyBindingAttestation({ accountAddress: addr, accountPublicKey: pk, pursePublicKey: purseHex, bindingSignature: zeroSig }),
+        pk,
+      ).toBe(false);
+    }
   });
 
   it('rejects a tampered signature and structurally malformed input without throwing', () => {

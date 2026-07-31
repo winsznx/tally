@@ -42,7 +42,11 @@ walks two chains back to their common ancestor and reports the fork point.
   sorted leaves, `Blake2b(0x00 || id)` leaf / `Blake2b(0x01 || l || r)` node,
   odd node promoted, empty set → 32 zero bytes.
 
-Out of scope here, tracked as issues rather than TODOs: verifying the wallet
-binding attestation that ties a purse key to an account (needs the wallet
-message format), purse-key rotation, and a `CONTESTED → VOIDED` resolution
-entry type.
+The wallet binding attestation that ties a purse key to an account is verified
+at registration — `LEDGER_OPEN` and `MEMBER_JOIN` carry it and replay rejects
+any whose attestation does not verify (see [`../binding`](../binding/)). After
+registration a single shared guard requires every later entry from that account
+to carry the registered purse key.
+
+Still out of scope here, tracked as issues rather than TODOs: purse-key
+rotation, and a `CONTESTED → VOIDED` resolution entry type.

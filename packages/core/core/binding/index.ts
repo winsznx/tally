@@ -35,6 +35,35 @@ const HEX40 = /^[0-9a-f]{40}$/;
 const HEX64 = /^[0-9a-f]{64}$/;
 const HEX128 = /^[0-9a-f]{128}$/;
 
+/**
+ * Compressed encodings of the Ed25519 small-order (torsion) points — libsodium's
+ * `has_small_order` table. @nimiq/core verifies with the COFACTORED equation, so
+ * a public key that is one of these points makes the `h·A` term vanish and a
+ * forged signature verifies over ANY message (the classic identity-key forgery).
+ * A legitimate Nimiq account key is a scalar multiple of the base point and is
+ * never a torsion point, so rejecting these rejects nothing real.
+ */
+const SMALL_ORDER_POINTS: readonly string[] = [
+  '0000000000000000000000000000000000000000000000000000000000000000',
+  '0100000000000000000000000000000000000000000000000000000000000000',
+  '26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc05',
+  'c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac037a',
+  'ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f',
+  'edffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f',
+  'eeffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f',
+];
+
+/**
+ * True if a 32-byte compressed point encoding is a small-order point. The sign
+ * bit of the final byte is cleared before comparison so non-canonical encodings
+ * collapse onto their canonical form, exactly as libsodium's has_small_order().
+ */
+function isSmallOrderPoint(pointHex: string): boolean {
+  if (!HEX64.test(pointHex)) return true; // malformed → treat as unusable
+  const lastByte = ((parseInt(pointHex.slice(62, 64), 16) & 0x7f) >>> 0).toString(16).padStart(2, '0');
+  return SMALL_ORDER_POINTS.includes(pointHex.slice(0, 62) + lastByte);
+}
+
 export interface BindingAttestation {
   /** The Nimiq Pay account address, 40 lowercase hex (20 bytes). */
   accountAddress: AddressHex;
@@ -75,6 +104,12 @@ export function verifyBindingAttestation(att: BindingAttestation): boolean {
   if (!HEX64.test(att.accountPublicKey)) return false;
   if (!HEX64.test(att.pursePublicKey)) return false;
   if (!HEX128.test(att.bindingSignature)) return false;
+  // @nimiq/core's cofactored Ed25519 verify accepts a forged signature over any
+  // message when the account key (or the signature's R) is a small-order point,
+  // so reject those before verifying. Rejecting a zero s is cheap belt-and-braces.
+  if (isSmallOrderPoint(att.accountPublicKey)) return false;
+  if (isSmallOrderPoint(att.bindingSignature.slice(0, 64))) return false;
+  if (att.bindingSignature.slice(64) === '0'.repeat(64)) return false;
   try {
     const accountPk = PublicKey.deserialize(hexToBytes(att.accountPublicKey));
     if (bytesToHex(accountPk.toAddress().serialize()) !== att.accountAddress) return false;
