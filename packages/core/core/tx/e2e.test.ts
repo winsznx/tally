@@ -19,6 +19,7 @@ import {
   type LogEntry,
 } from '../log/index.js';
 import { computePlan, type Obligation } from '../netting/index.js';
+import { createBindingAttestation } from '../binding/index.js';
 import { TESTNET_NETWORK_ID, buildSettlementLeg, type SettlementLeg } from './index.js';
 
 const alice = KeyPair.derive(PrivateKey.fromHex('a1'.repeat(32)));
@@ -28,6 +29,8 @@ const addr = (kp: KeyPair): string => bytesToHex(kp.toAddress().serialize());
 const pk = (kp: KeyPair): string => bytesToHex(kp.publicKey.serialize());
 
 let nonceCounter = 0x100;
+// This determinism test uses one key per member as both account and purse, so
+// the binding a registration entry carries is the account attesting its own key.
 function makeEntry(
   kp: KeyPair,
   entryType: EntryType,
@@ -36,11 +39,16 @@ function makeEntry(
   logicalClock: number,
 ): LogEntry {
   nonceCounter += 1;
+  let full = payload;
+  if (entryType === 'LEDGER_OPEN' || entryType === 'MEMBER_JOIN') {
+    const att = createBindingAttestation(kp, pk(kp));
+    full = { ...payload, accountPublicKey: att.accountPublicKey, bindingSignature: att.bindingSignature };
+  }
   return signEntry(
     {
       prevEntryHash,
       entryType,
-      payload,
+      payload: full,
       authorAddress: addr(kp),
       pursePublicKey: pk(kp),
       nonce: nonceCounter.toString(16).padStart(32, '0'),

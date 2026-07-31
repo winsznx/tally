@@ -19,6 +19,7 @@
  */
 import { Hash, KeyPair, PublicKey, Signature } from '@nimiq/core';
 import { bytesToHex, concatBytes, hexToBytes, utf8 } from '../internal/bytes.js';
+import { verifyBindingAttestation } from '../binding/index.js';
 import { MAX_ANCHOR_HEIGHT, MAX_LUNA, type AddressHex, type NettingMode, type Obligation } from '../netting/index.js';
 
 export type EntryType =
@@ -162,13 +163,26 @@ function validatePayload(entryType: EntryType, payload: Record<string, unknown>)
     for (const k of keys) if (!allowed.includes(k)) throw new LogError(`${entryType}: unexpected payload key "${k}"`);
     for (const k of required) if (!(k in payload)) throw new LogError(`${entryType}: missing payload key "${k}"`);
   };
+  // LEDGER_OPEN and MEMBER_JOIN register a member, so both carry the binding
+  // attestation that proves the entry's purse key speaks for authorAddress (the
+  // account). Structural checks here; the signature is verified in replay.
+  const requireBindingFields = (): void => {
+    if (typeof payload['accountPublicKey'] !== 'string' || !PK_RE.test(payload['accountPublicKey'])) {
+      throw new LogError(`${entryType}: accountPublicKey must be 64 lowercase hex chars`);
+    }
+    if (typeof payload['bindingSignature'] !== 'string' || !SIG_RE.test(payload['bindingSignature'])) {
+      throw new LogError(`${entryType}: bindingSignature must be 128 lowercase hex chars`);
+    }
+  };
   switch (entryType) {
     case 'LEDGER_OPEN':
-      expect(['name'], ['name']);
+      expect(['name', 'accountPublicKey', 'bindingSignature'], ['name', 'accountPublicKey', 'bindingSignature']);
       if (typeof payload['name'] !== 'string') throw new LogError('LEDGER_OPEN: name must be a string');
+      requireBindingFields();
       return;
     case 'MEMBER_JOIN':
-      expect([], []);
+      expect(['accountPublicKey', 'bindingSignature'], ['accountPublicKey', 'bindingSignature']);
+      requireBindingFields();
       return;
     case 'OBLIGATION_PROPOSE': {
       expect(['debtor', 'creditor', 'amount', 'memo'], ['debtor', 'creditor', 'amount']);
@@ -347,14 +361,33 @@ export function replayState(entries: LogEntry[]): LedgerState {
     ignored.push({ id: s.id, entryType: s.entry.entryType, reason });
   };
 
+  // The one shared purse-key guard: any entry whose author is already a
+  // registered member MUST carry that member's registered purse key. Hoisted
+  // above the switch so no present or future handler can forget it.
+  const bindingValid = (e: LogEntry): boolean =>
+    verifyBindingAttestation({
+      accountAddress: e.authorAddress,
+      accountPublicKey: e.payload['accountPublicKey'] as string,
+      pursePublicKey: e.pursePublicKey,
+      bindingSignature: e.payload['bindingSignature'] as string,
+    });
+
   for (const s of ordered) {
     const e = s.entry;
-    const isMember = members.has(e.authorAddress);
     const registeredPk = members.get(e.authorAddress);
+    if (registeredPk !== undefined && registeredPk !== e.pursePublicKey) {
+      skip(s, 'purse key does not match the one registered at join');
+      continue;
+    }
+    const isMember = registeredPk !== undefined;
     switch (e.entryType) {
       case 'LEDGER_OPEN': {
         if (genesisHash !== null) {
           skip(s, 'ledger already open');
+          break;
+        }
+        if (!bindingValid(e)) {
+          skip(s, 'binding attestation does not verify — purse is not bound to authorAddress');
           break;
         }
         ledgerName = e.payload['name'] as string;
@@ -367,8 +400,9 @@ export function replayState(entries: LogEntry[]): LedgerState {
           skip(s, 'no ledger open');
           break;
         }
-        if (isMember) {
-          if (registeredPk !== e.pursePublicKey) skip(s, 'member already joined with a different purse key');
+        if (isMember) break; // duplicate join with the registered purse key: no-op
+        if (!bindingValid(e)) {
+          skip(s, 'binding attestation does not verify — purse is not bound to authorAddress');
           break;
         }
         members.set(e.authorAddress, e.pursePublicKey);
@@ -377,10 +411,6 @@ export function replayState(entries: LogEntry[]): LedgerState {
       case 'OBLIGATION_PROPOSE': {
         if (!isMember) {
           skip(s, 'author is not a member');
-          break;
-        }
-        if (registeredPk !== e.pursePublicKey) {
-          skip(s, 'purse key does not match the one registered at join');
           break;
         }
         const debtor = e.payload['debtor'] as AddressHex;
@@ -415,10 +445,6 @@ export function replayState(entries: LogEntry[]): LedgerState {
           skip(s, 'only the named debtor can accept — silence or third parties never consent');
           break;
         }
-        if (registeredPk !== e.pursePublicKey) {
-          skip(s, 'purse key does not match the one registered at join');
-          break;
-        }
         if (ob.status !== 'PROPOSED' && ob.status !== 'CONTESTED') {
           skip(s, `obligation is ${ob.status}, not acceptable`);
           break;
@@ -438,10 +464,6 @@ export function replayState(entries: LogEntry[]): LedgerState {
           skip(s, 'only the named debtor can reject');
           break;
         }
-        if (registeredPk !== e.pursePublicKey) {
-          skip(s, 'purse key does not match the one registered at join');
-          break;
-        }
         if (ob.status !== 'PROPOSED') {
           skip(s, `obligation is ${ob.status}, not rejectable`);
           break;
@@ -452,10 +474,6 @@ export function replayState(entries: LogEntry[]): LedgerState {
       case 'ROUND_OPEN': {
         if (!isMember) {
           skip(s, 'author is not a member');
-          break;
-        }
-        if (registeredPk !== e.pursePublicKey) {
-          skip(s, 'purse key does not match the one registered at join');
           break;
         }
         const round = e.payload['round'] as number;
@@ -486,10 +504,6 @@ export function replayState(entries: LogEntry[]): LedgerState {
       case 'ROUND_EXPIRE': {
         if (!isMember) {
           skip(s, 'author is not a member');
-          break;
-        }
-        if (registeredPk !== e.pursePublicKey) {
-          skip(s, 'purse key does not match the one registered at join');
           break;
         }
         const round = e.payload['round'] as number;

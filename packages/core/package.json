@@ -9,7 +9,8 @@
     "./netting": "./core/netting/index.ts",
     "./anchor": "./core/anchor/index.ts",
     "./log": "./core/log/index.ts",
-    "./tx": "./core/tx/index.ts"
+    "./tx": "./core/tx/index.ts",
+    "./binding": "./core/binding/index.ts"
   },
   "scripts": {
     "test": "vitest run",

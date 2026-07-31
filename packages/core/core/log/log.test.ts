@@ -1,6 +1,7 @@
 import { KeyPair, PrivateKey } from '@nimiq/core';
 import { describe, expect, it } from 'vitest';
 import { bytesToHex } from '../internal/bytes.js';
+import { createBindingAttestation } from '../binding/index.js';
 import {
   LogError,
   TallyLog,
@@ -14,13 +15,27 @@ import {
   type LogEntry,
 } from './index.js';
 
-const alice = KeyPair.derive(PrivateKey.fromHex('01'.repeat(32)));
-const bob = KeyPair.derive(PrivateKey.fromHex('02'.repeat(32)));
-const carol = KeyPair.derive(PrivateKey.fromHex('03'.repeat(32)));
-const mallory = KeyPair.derive(PrivateKey.fromHex('ee'.repeat(32)));
+/**
+ * A member has two keys: an account key (the Nimiq Pay wallet, identifies the
+ * member and signs the binding) and a purse/session key (signs log entries).
+ * authorAddress is the ACCOUNT address; the binding proves the purse speaks
+ * for it.
+ */
+interface Member {
+  account: KeyPair;
+  purse: KeyPair;
+}
+const mk = (accountSeed: string, purseSeed: string): Member => ({
+  account: KeyPair.derive(PrivateKey.fromHex(accountSeed.repeat(32))),
+  purse: KeyPair.derive(PrivateKey.fromHex(purseSeed.repeat(32))),
+});
+const alice = mk('a1', 'a2');
+const bob = mk('b1', 'b2');
+const carol = mk('c1', 'c2');
+const mallory = mk('e1', 'e2');
 
-const addr = (kp: KeyPair): string => bytesToHex(kp.toAddress().serialize());
-const pk = (kp: KeyPair): string => bytesToHex(kp.publicKey.serialize());
+const addr = (m: Member): string => bytesToHex(m.account.toAddress().serialize());
+const pursePk = (m: Member): string => bytesToHex(m.purse.publicKey.serialize());
 
 let nonceCounter = 0;
 function nextNonce(): string {
@@ -28,17 +43,24 @@ function nextNonce(): string {
   return nonceCounter.toString(16).padStart(32, '0');
 }
 
+/** Builds an entry authored by m's account and signed by m's purse. Registration
+ * entries (LEDGER_OPEN, MEMBER_JOIN) get a valid binding auto-injected. */
 function makeEntry(
-  kp: KeyPair,
+  m: Member,
   entryType: EntryType,
   payload: Record<string, unknown>,
   prevEntryHash: string | null,
   logicalClock: number,
   nonce: string = nextNonce(),
 ): LogEntry {
+  let full = payload;
+  if (entryType === 'LEDGER_OPEN' || entryType === 'MEMBER_JOIN') {
+    const att = createBindingAttestation(m.account, pursePk(m));
+    full = { ...payload, accountPublicKey: att.accountPublicKey, bindingSignature: att.bindingSignature };
+  }
   return signEntry(
-    { prevEntryHash, entryType, payload, authorAddress: addr(kp), pursePublicKey: pk(kp), nonce, logicalClock },
-    kp,
+    { prevEntryHash, entryType, payload: full, authorAddress: addr(m), pursePublicKey: pursePk(m), nonce, logicalClock },
+    m.purse,
   );
 }
 
@@ -88,24 +110,13 @@ describe('entry validation and signatures', () => {
   it('rejects a tampered payload', () => {
     const open = makeEntry(alice, 'LEDGER_OPEN', { name: 'x' }, null, 0);
     validateEntry(open);
-    expect(() => validateEntry({ ...open, payload: { name: 'y' } })).toThrow(LogError);
+    expect(() => validateEntry({ ...open, payload: { ...open.payload, name: 'y' } })).toThrow(LogError);
   });
 
   it('rejects an entry signed by a key other than its pursePublicKey', () => {
-    const forged = signEntry(
-      {
-        prevEntryHash: null,
-        entryType: 'LEDGER_OPEN',
-        payload: { name: 'x' },
-        authorAddress: addr(alice),
-        pursePublicKey: pk(mallory),
-        nonce: nextNonce(),
-        logicalClock: 0,
-      },
-      mallory,
-    );
-    const withAlicePk = { ...forged, pursePublicKey: pk(alice) };
-    expect(() => validateEntry(withAlicePk)).toThrow(LogError);
+    const valid = makeEntry(bob, 'OBLIGATION_ACCEPT', { proposeId: '11'.repeat(32) }, 'aa'.repeat(32), 3);
+    // signature was made by bob's purse; swapping the claimed purse key breaks it
+    expect(() => validateEntry({ ...valid, pursePublicKey: pursePk(mallory) })).toThrow(LogError);
   });
 
   it('reserves clock 0 and null prev for LEDGER_OPEN', () => {
@@ -230,6 +241,69 @@ describe('order-independent replay', () => {
   });
 });
 
+describe('binding attestation at registration', () => {
+  it('registers a member only when the join carries a valid binding', () => {
+    const { log } = basicLedger();
+    const state = log.replay();
+    expect(state.members.map((m) => m.address).sort()).toEqual([addr(alice), addr(bob)].sort());
+    // bob registered with bob's purse key, proven by bob's account binding
+    const bobMember = state.members.find((m) => m.address === addr(bob));
+    expect(bobMember?.pursePublicKey).toBe(pursePk(bob));
+  });
+
+  it('skips a MEMBER_JOIN whose binding was signed by the wrong account', () => {
+    const log = new TallyLog();
+    log.append(makeEntry(alice, 'LEDGER_OPEN', { name: 'x' }, null, 0));
+    // Craft a join claiming bob's account + bob's purse, but sign the binding
+    // with mallory's account key. authorAddress=bob so bob's purse signs the entry.
+    const forgedBinding = createBindingAttestation(mallory.account, pursePk(bob));
+    const join = signEntry(
+      {
+        prevEntryHash: log.headHash,
+        entryType: 'MEMBER_JOIN',
+        payload: { accountPublicKey: forgedBinding.accountPublicKey, bindingSignature: forgedBinding.bindingSignature },
+        authorAddress: addr(bob),
+        pursePublicKey: pursePk(bob),
+        nonce: nextNonce(),
+        logicalClock: 1,
+      },
+      bob.purse,
+    );
+    log.append(join);
+    const state = log.replay();
+    expect(state.members.map((m) => m.address)).toEqual([addr(alice)]);
+    expect(state.ignored.some((i) => i.entryType === 'MEMBER_JOIN' && i.reason.includes('binding'))).toBe(true);
+  });
+
+  it('rejects a binding replayed from another ledger onto a different purse', () => {
+    // A real binding alice made for HER purse, lifted into a join that an
+    // attacker signs with a different purse. The binding names alice's purse,
+    // but the entry's purse key is the attacker's, so verification fails.
+    const log = new TallyLog();
+    log.append(makeEntry(bob, 'LEDGER_OPEN', { name: 'other ledger' }, null, 0));
+    const aliceRealBinding = createBindingAttestation(alice.account, pursePk(alice));
+    const replayed = signEntry(
+      {
+        prevEntryHash: log.headHash,
+        entryType: 'MEMBER_JOIN',
+        payload: {
+          accountPublicKey: aliceRealBinding.accountPublicKey,
+          bindingSignature: aliceRealBinding.bindingSignature,
+        },
+        authorAddress: addr(alice),
+        pursePublicKey: pursePk(mallory), // attacker's purse, not the one alice bound
+        nonce: nextNonce(),
+        logicalClock: 1,
+      },
+      mallory.purse,
+    );
+    log.append(replayed);
+    const state = log.replay();
+    expect(state.members.map((m) => m.address)).toEqual([addr(bob)]);
+    expect(state.ignored.some((i) => i.reason.includes('binding'))).toBe(true);
+  });
+});
+
 describe('membership and purse-key consistency', () => {
   it('skips entries whose purse key differs from the one registered at join', () => {
     const { log } = basicLedger();
@@ -239,11 +313,11 @@ describe('membership and purse-key consistency', () => {
         entryType: 'OBLIGATION_PROPOSE',
         payload: { debtor: addr(alice), creditor: addr(bob), amount: '9999' },
         authorAddress: addr(bob),
-        pursePublicKey: pk(mallory),
+        pursePublicKey: pursePk(mallory),
         nonce: nextNonce(),
         logicalClock: 3,
       },
-      mallory,
+      mallory.purse,
     );
     log.append(impostor);
     const state = log.replay();
@@ -295,11 +369,11 @@ describe('rounds', () => {
         entryType: 'ROUND_OPEN',
         payload: { round: 1, anchorHeight: 999999, mode: 'minimal' },
         authorAddress: addr(alice),
-        pursePublicKey: pk(mallory),
+        pursePublicKey: pursePk(mallory),
         nonce: nextNonce(),
         logicalClock: 4,
       },
-      mallory,
+      mallory.purse,
     );
     log.append(forgedOpen);
     let state = log.replay();
@@ -314,11 +388,11 @@ describe('rounds', () => {
         entryType: 'ROUND_EXPIRE',
         payload: { round: 1 },
         authorAddress: addr(bob),
-        pursePublicKey: pk(mallory),
+        pursePublicKey: pursePk(mallory),
         nonce: nextNonce(),
         logicalClock: 6,
       },
-      mallory,
+      mallory.purse,
     );
     log.append(forgedExpire);
     state = log.replay();
