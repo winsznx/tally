@@ -1,0 +1,25 @@
+{
+  "name": "@tally/relay",
+  "version": "0.1.0",
+  "description": "Tally log relay — untrusted store-and-forward on Cloudflare Workers + D1",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:init": "wrangler d1 execute tally-relay --file=./schema.sql",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@tally/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20240909.0",
+    "@nimiq/core": "^2.7.2",
+    "typescript": "^5.5.0",
+    "vitest": "^2.1.0",
+    "wrangler": "^3.78.0"
+  }
+}

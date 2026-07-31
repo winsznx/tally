@@ -1,0 +1,14 @@
+name = "tally-relay"
+main = "src/index.ts"
+compatibility_date = "2024-09-09"
+
+# D1 binding. Create the database with:
+#   wrangler d1 create tally-relay
+# then paste the returned database_id below and run `pnpm db:init`.
+[[d1_databases]]
+binding = "DB"
+database_name = "tally-relay"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+
+[observability]
+enabled = true
