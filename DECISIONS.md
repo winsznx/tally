@@ -76,3 +76,25 @@ has been corrected rather than the number quietly restated.
 Manual settlement is built as a complete product in its own right: same netting, same anchoring, same reconciliation, same log, one dialog per leg. The purse layers on top and is never a dependency.
 
 This is deliberate insurance. An app-managed hot key is an ordinary user-funded pattern, but it isn't an endorsed framework feature. If a reviewer reads it as outside the framework's expectations, we lose one feature rather than the product.
+
+## Cycle III decisions
+
+### Automatic payments switched off
+
+Cycle I's purse let a member fund an app-held key and settle with no prompts, made safe against double payment by building byte-identical transactions on every device. Two things changed. Nimiq Pay now keeps spendable NIM in an HTLC co-signed with Nimiq Pay that rotates about weekly, so the account a purse would be funded from is no longer a stable wallet account. And a hot key in a WebView is exactly as safe as the phone and the app's JavaScript. The product without it is still complete: one approval per payment, in Nimiq Pay's own prompt. The purse code stays in core for log compatibility and nothing in the app reaches it.
+
+### Payments are credited when verified, not when planned
+
+Cycle I closed a round by matching on-chain transfers to a pinned plan, and a round could expire after some of its legs were paid, putting paid debts back into netting. Now a payment is a signed claim that moves nothing until the chain confirms it, and then it nets as a debt in the opposite direction. Whatever really moved is counted at its real amount, so a stale plan, a partial payment or an accidental second payment can never be counted twice or lost; at worst the recipient visibly owes some back.
+
+### Idempotency by memo, not by identical bytes
+
+With Nimiq Pay choosing the sender HTLC, fee and validity height, two devices can no longer be made to produce the same transaction. Each payment instead carries a reference bound to the payer, the intent is saved before the prompt, and an unknown outcome is resolved by finding that reference on chain. A new payment is refused until the old one resolves.
+
+### Expenses are one signed entry
+
+An expense records who paid, the total, the split method and every share in one entry signed by the payer. Each other person's share becomes a proposed obligation with an id derived from the expense, so it still needs that person's own signed agreement. Only the payer can record an expense: someone recording a payment they did not make would be asserting a fact they cannot sign for.
+
+### The relay moved to Postgres
+
+The API replaces the Cloudflare Worker with Fastify and Postgres on our own host, keeping the same trust model: it validates and stores, and clients re-verify everything. It also indexes payment intents and runs a chain reconciler, so a payment started on one device can be followed on another.

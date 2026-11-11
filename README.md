@@ -1,150 +1,87 @@
-# Tally
+<p><img src="packages/app/public/brand/tally-wordmark.svg" alt="Tally" height="40"></p>
 
-Keep a running tab with your people, and stop approving payments.
+**Shared expenses. Actually settled.** A Nimiq Pay Mini App that keeps one tab for a group, gets every share agreed by the person who owes it, cuts circular debts down to the fewest NIM payments, and only marks a payment paid once it has found it on the Nimiq network.
 
-**[Live demo](https://tally-646.pages.dev)** · [Architecture](ARCHITECTURE.md) · [Decisions](DECISIONS.md) · [Security](SECURITY.md) · [Reviews](REVIEWS.md)
+**[Open the app](https://tally-neon-chi.vercel.app)** · Nimiq mainnet · MIT
 
-A Nimiq Pay Mini App. Testnet.
+## Who it is for
 
-## The problem
+Two to twelve people who keep spending together and already use NIM: a trip, a shared flat, a team lunch, a weekly dinner. Someone covers the bill, everyone says "I'll send it", and a week later the person who paid is scrolling the group chat working out who did. A spreadsheet says who owes whom. It does not say who actually paid.
 
-Bill splitting apps produce a list saying X owes Y 2,400, and then nothing happens. The debt sits there. Nobody pays, because moving small amounts costs fees, takes minutes, and needs everyone online on the same rail at once.
+## Using it
 
-The tracking was never the problem. The settling is.
+1. Open `https://tally-neon-chi.vercel.app` in Nimiq Pay (Mini Apps, then Custom URL), or tap `https://nimpay.app/miniapps/open/tally-neon-chi.vercel.app/app` on your phone.
+2. Sign in: Nimiq Pay asks you to share your account, then to sign one message that lets this device record your agreements. It cannot move NIM.
+3. Start a tab and share the invite. Others open it in Nimiq Pay and join.
+4. Whoever paid adds the expense and how to split it (equally, exact amounts or percentages, exact to the Luna).
+5. Each person agrees to their share or declines it. Nothing is owed until they agree.
+6. **Settle up** shows the fewest payments that clear the tab. You pay your part in Nimiq Pay; the receipt says *Paid, confirmed on Nimiq* only after Tally has found it on chain.
 
-## What Tally does
+In a normal browser the site explains Tally and hands you to Nimiq Pay. It never pretends a wallet is connected.
 
-It takes a graph of who owes whom, computes the smallest set of transfers that clears it, and executes them without asking for a confirmation per payment.
+## How it uses Nimiq Pay and NIM
 
-Four friends, five debts, from the PRD's worked example:
+| What | Where |
+| --- | --- |
+| Wallet port over `@nimiq/mini-app-sdk` 0.2.5: `listAccounts` (wallet address plus the rotating spending HTLC), `sign`, `getBalance`, `sendBasicTransactionWithData`, `accountsChanged`, typed `NimiqProviderError` handling | [`packages/app/src/lib/wallet/nimiq-pay.ts`](packages/app/src/lib/wallet/nimiq-pay.ts) |
+| Identity is the address derived from the signature's public key, never `listAccounts()[0]` | [`packages/app/src/lib/identity.ts`](packages/app/src/lib/identity.ts) |
+| Payments: intent saved before the prompt, payer-bound memo `TLY2.<tab>.<ref>`, unknown outcomes reconciled by finding the memo on chain, no second payment while one is unresolved | [`packages/app/src/lib/payments.ts`](packages/app/src/lib/payments.ts) |
+| A payment counts only when the chain shows the right recipient, exact amount, network, memo, successful execution and macro-block finality | [`packages/core/core/settle/index.ts`](packages/core/core/settle/index.ts) |
+| Netting: pairwise collapse, cycle cancellation, greedy matching, all in integer Luna | [`packages/core/core/netting/index.ts`](packages/core/core/netting/index.ts) |
 
-```
-Ada owes Bo    500        Ada owes Dee  1200
-Bo  owes Cy    500        Bo  owes Dee   300
-Cy  owes Ada   500
-```
+The worked example Tally has always published still holds and is a fixed test: Ada owes Bo 500, Bo owes Cy 500, Cy owes Ada 500, Ada owes Dee 1200, Bo owes Dee 300. Five debts become two payments (Ada to Dee 1200, Bo to Dee 300) and Cy pays nothing. Savings depend on how a group's debts connect; the plan never needs more than one payment fewer than the number of people.
 
-Ada, Bo and Cy owe each other in a circle. That circle cancels exactly, and no money moves for it. What's left:
+## Verified on mainnet
 
-```
-Ada  ->  Dee   1200
-Bo   ->  Dee    300
-```
+On 11 November 2026 two Nimiq Pay wallets created a tab, joined it, recorded a shared expense, agreed to the share and settled it from the deployed app:
 
-Five obligations become two transfers, and Cy nets to zero and drops out of the round entirely, so Cy never opens the app at all. That second effect is what a transfer count hides: netting reduces how many people have to show up, not just how many payments happen.
+- Transaction [`457faf49…3f075205`](https://nimiq.watch/#457faf4916dc9661fe63799fb3e678c0f532cae16220c7c5e3a997663f075205): 0.5 NIM, fee 0, sent from the payer's Nimiq Pay HTLC, memo `TLY2.vcdzucs5.eazfimihzxfho3er` intact.
+- Intent saved 22:18:39 UTC, in a block 3 s later, confirmed by Tally after macro-block finality at 22:19:40 UTC.
+- The app's own chain check and the server's independent reconciler both reached `confirmed`.
 
-`pnpm --filter @tally/core test` covers this exact example as a fixed regression, asserting two transfers and Cy's absence.
+That is one end-to-end payment between two of the builder's own wallets. It shows the path works; it is not usage data.
 
-## Why this only works on Nimiq
+## Run it locally
 
-Auto-settling small amounts on a fee-bearing chain means holding a gas token and pre-approving spends before anything can move on your behalf. Ask someone to keep POL topped up so their share of dinner settles itself and you've lost them. The mechanic doesn't survive contact with gas.
-
-Nimiq transfers are feeless, so clearing a 3 NIM debt is worth doing at all. Where the fee exceeds the debt, small automatic settlement is pointless, which is why nobody builds it there.
-
-Anchoring is free too. Each settlement transfer carries its round's commitment in its own 64-byte data field, so the audit trail rides along with the payment instead of costing a second transaction.
-
-We considered settling in USDT and rejected it. Gas kills the premise, and asking a non-crypto person to hold two tokens to split a taxi fare is worse than the problem. That's a design position, not an omission. [DECISIONS.md](DECISIONS.md) lists everything rejected and why.
-
-## How it works
-
-### The purse
-
-Joining a tab takes two approvals: one to choose which of your addresses is you, and one to sign the message binding an app-generated key, the purse, to that account. Both are structural. The log requires an attested purse from a member's first entry, and the message has to name the purse, which is only known once it exists. Funding the purse is a third approval, and it is optional forever.
-
-```mermaid
-sequenceDiagram
-    actor U as User
-    participant T as Tally
-    participant P as Nimiq Pay
-    participant C as Nimiq chain
-
-    U->>T: Join this tab
-    T->>P: listAccounts
-    P->>U: Approval dialog 1
-    T->>T: generate purse keypair
-    T->>P: sign binding message naming the purse
-    P->>U: Approval dialog 2
-    U->>T: Top up the purse (optional)
-    T->>P: sendBasicTransaction to purse address
-    P->>U: Approval dialog 3
-    Note over T,C: From here the purse acts alone.
-```
-
-The purse has two jobs. It signs log entries, which every mode uses and which risks nothing. It also holds NIM and broadcasts settlements with no dialog, which only auto-settle mode uses. Manual mode disables the second job only: same netting, same anchoring, same audit trail, one dialog per payment. Skipping the purse costs taps, not features.
-
-The binding proves which account a purse speaks for, and replay rejects any member whose attestation doesn't verify.
-
-### The netting engine
-
-```mermaid
-flowchart TD
-    A["Accepted obligations"] --> B["Pairwise collapse"]
-    B --> C["Cycle cancellation"]
-    C --> D["Net positions<br/>sum must be zero"]
-    D --> E["Greedy minimisation"]
-    E --> F["At most n-1 transfers"]
-```
-
-Cycle cancellation is exact, and removes debt without moving money. The zero-sum check runs on every execution in production, not just in tests. Greedy minimisation matches the largest debtor to the largest creditor directly, so every transfer goes debtor to creditor with no intermediary hops, and nobody's payment waits on a third person.
-
-### The anchor chain
-
-Each round's commitment chains to the one before it:
-
-```mermaid
-flowchart LR
-    Z["root 0"] --> H1{{"Blake2b"}}
-    L1["obligation log root"] --> H1
-    P1["settlement plan"] --> H1
-    H1 --> R1["root 1"]
-    R1 --> H2{{"Blake2b"}}
-    L2["log root 2"] --> H2
-    P2["plan 2"] --> H2
-    H2 --> R2["root 2"]
-    R1 -.->|"rides in round 1 transfers"| T1["on-chain"]
-    R2 -.->|"rides in round 2 transfers"| T2["on-chain"]
-```
-
-Change one obligation in round 1 and root 1 changes, which changes every root after it. Those roots already sit in transfers that already settled and can't be recalled. Tally's backend can't quietly revise what you owed last month, because the money that already moved commits to the old history.
-
-## What it doesn't do
-
-**Nothing runs while the app is closed.** Mini apps have no background worker, no push channel, and no hosted signer. A purse is live only while Tally is open, so settlement happens when you open the app, not on a schedule. Any copy suggesting otherwise would be false.
-
-**Verification needs the exported log.** Anchors prove a round's transfers are complete, correctly indexed and consistent with a committed plan. They can't prove the obligations behind them were real. A full audit needs the signed log alongside the chain data, which any member can export.
-
-**The purse is a hot key.** It lives in WebView storage, and its balance is the entire security boundary. That bound is protocol-level and absolute. It's a cash drawer, not a vault, and the app says so before anyone funds it.
-
-**The chain proves settlement, not truth.** It shows money moved between specific addresses in a pattern matching a committed plan. It can't show dinner happened or that the split was fair.
-
-**Nobody can be forced to settle.** With no contract enforcement available, a member who never funds their purse simply doesn't pay. What Tally produces is permanent, public, attributable evidence of who didn't. That's social pressure, and calling it stronger would be dishonest.
-
-## Running it
-
-Needs Node 20+ and pnpm.
-
-```sh
+```bash
 pnpm install
-pnpm -r test          # vitest + fast-check
-pnpm -r typecheck
-pnpm --filter @tally/app dev     # one origin, ?app=1 forces the app half
-pnpm --filter @tally/relay dev   # the relay
+pnpm -r test                                   # core, app, server (needs a local Postgres)
+createdb tally_dev && pnpm --filter @tally/server build
+DATABASE_URL=postgresql://localhost/tally_dev node packages/server/dist/migrate.js
+DATABASE_URL=postgresql://localhost/tally_dev CORS_ORIGINS=http://localhost:5174 node packages/server/dist/index.js
+VITE_API_URL=http://localhost:8080 pnpm --filter @tally/app dev
 ```
 
-Deploying to Cloudflare is `npx wrangler login` then `./scripts/deploy.sh`. See [DEPLOY.md](DEPLOY.md). There are no secrets in this repository and none are needed, which is a deliberate property explained there.
+Open `http://localhost:5174/app?preview=ada` (and `?preview=bo` in another browser profile) to click through with a development-only preview wallet that signs but cannot send. It is excluded from production builds. Deployment: [DEPLOY.md](DEPLOY.md).
 
-To record a demo without recruiting three people, `pnpm seed:demo --dee <your address>` creates Ada, Bo and Cy as real cryptographic members with the obligations above, and prints an invite link.
+## What is new for Cycle III
 
-## Repo map
+Tally was entered in Cycle I and did not win. This is a rebuild of that entry, in the same repository with its history intact.
 
-| Package | What it owns | Why it exists |
-| --- | --- | --- |
-| `packages/core` | Netting, anchor format, signed log, deterministic transactions, binding attestation | Pure modules with no DOM and no network, so the rules that move money are testable without a phone |
-| `packages/app` | Mini app, landing page, adapters, screens | One origin serves both halves. External dependencies sit behind interfaces so flows run against fakes |
-| `packages/relay` | Cloudflare Worker plus D1 | Stores and forwards signed entries. Untrusted by design: it can omit, reorder or go down, and it cannot forge |
+| Cycle I | Cycle III |
+| --- | --- |
+| Testnet only | Nimiq mainnet, with a live payment above |
+| Auto-settle from an app-held "purse" key, deterministic transaction bytes | Purse switched off: Nimiq Pay now pays from a co-signed, rotating HTLC, and a hot key on the phone is too easy to lose. Every payment is approved in Nimiq Pay ([`df6d6ba`](https://github.com/winsznx/tally/commit/df6d6ba)) |
+| SDK 0.1.0, payer identified from the returned transaction's sender | SDK 0.2.5, identity proven by signature, HTLC tracked separately, typed wallet errors ([`df6d6ba`](https://github.com/winsznx/tally/commit/df6d6ba)) |
+| A round could expire after partial payment and re-count paid debts | Chain-verified payments net as reverse debts, so a stale plan or duplicate send leaves a visible credit, never a double charge ([`d8471b0`](https://github.com/winsznx/tally/commit/d8471b0)) |
+| Pairwise "owes" entries only | Expenses with equal, exact or percentage splits, creditor withdraw and forgive, display names ([`d8471b0`](https://github.com/winsznx/tally/commit/d8471b0)) |
+| A failed-but-included transaction could read as paid | `executionResult`, recipient, amount, memo and finality all checked ([`d8471b0`](https://github.com/winsznx/tally/commit/d8471b0)) |
+| Cloudflare Worker + D1 relay | Fastify + Postgres API with idempotent appends, append-only storage and a chain reconciler ([`3b8b1cb`](https://github.com/winsznx/tally/commit/3b8b1cb)) |
+| Single-file vanilla UI, placeholder QR | Rebuilt React app and seven-section site, new identity, real scannable invites ([`8777288`](https://github.com/winsznx/tally/commit/8777288), [`d705401`](https://github.com/winsznx/tally/commit/d705401)) |
 
-## Documents
+The Cycle I security fixes in [REVIEWS.md](REVIEWS.md) still hold and their regression tests still pass.
 
-[ARCHITECTURE.md](ARCHITECTURE.md) for the engineering. [DECISIONS.md](DECISIONS.md) for what was rejected. [SECURITY.md](SECURITY.md) for the threat model. [REVIEWS.md](REVIEWS.md) for the bugs adversarial review found. [DEPLOY.md](DEPLOY.md) to ship it.
+## Limits, stated plainly
+
+- Anyone with a tab's link can read it. Payments are public on chain, like all Nimiq payments.
+- A display name is what someone typed; the wallet signature proves the address, not the person.
+- Tally records and verifies. It cannot make anyone pay.
+- The device key that signs your agreements lives in the app's storage. It holds no funds, but someone who controls your phone could agree to a request as you. See [SECURITY.md](SECURITY.md).
+- Tabs you have opened are listed on that device only. On a new device, open the invite link again.
+- The API currently uses an sslip.io hostname rather than a custom domain.
+
+## Repository
+
+`packages/core` netting, signed log, settlement verification · `packages/app` the Mini App and site · `packages/server` the API · `packages/relay` the Cycle I relay, kept for reference. Background: [ARCHITECTURE.md](ARCHITECTURE.md) (Cycle I design), [DECISIONS.md](DECISIONS.md), [SECURITY.md](SECURITY.md), [REVIEWS.md](REVIEWS.md).
 
 MIT licensed.
