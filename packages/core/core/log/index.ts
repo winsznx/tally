@@ -30,7 +30,10 @@ export type EntryType =
   | 'OBLIGATION_ACCEPT'
   | 'OBLIGATION_REJECT'
   | 'ROUND_OPEN'
-  | 'ROUND_EXPIRE';
+  | 'ROUND_EXPIRE'
+  | 'EXPENSE_RECORD'
+  | 'OBLIGATION_CANCEL'
+  | 'PAYMENT_RECORD';
 
 const ENTRY_TYPES: ReadonlySet<string> = new Set([
   'LEDGER_OPEN',
@@ -41,6 +44,9 @@ const ENTRY_TYPES: ReadonlySet<string> = new Set([
   'OBLIGATION_REJECT',
   'ROUND_OPEN',
   'ROUND_EXPIRE',
+  'EXPENSE_RECORD',
+  'OBLIGATION_CANCEL',
+  'PAYMENT_RECORD',
 ]);
 
 export interface LogEntry {
@@ -179,6 +185,24 @@ const SIG_RE = HEX_RE(128);
 const NONCE_RE = HEX_RE(32);
 const HASH_RE = HEX_RE(64);
 const AMOUNT_RE = /^[1-9][0-9]*$/;
+const DATE_RE = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
+
+export const MAX_DISPLAY_NAME = 40;
+export const MAX_TITLE = 80;
+export const MAX_CATEGORY = 24;
+export const MAX_NOTE = 280;
+export const MAX_SHARES = 50;
+export type SplitMethod = 'equal' | 'exact' | 'percent';
+const SPLIT_METHODS: ReadonlySet<string> = new Set<SplitMethod>(['equal', 'exact', 'percent']);
+
+function parseLuna(value: unknown, what: string): bigint {
+  if (typeof value !== 'string' || !AMOUNT_RE.test(value)) {
+    throw new LogError(`${what} must be a positive decimal Luna string`);
+  }
+  const amount = BigInt(value);
+  if (amount > MAX_LUNA) throw new LogError(`${what} exceeds MAX_LUNA (${MAX_LUNA})`);
+  return amount;
+}
 
 function validatePayload(entryType: EntryType, payload: Record<string, unknown>): void {
   const keys = Object.keys(payload).sort();
@@ -197,16 +221,90 @@ function validatePayload(entryType: EntryType, payload: Record<string, unknown>)
       throw new LogError(`${entryType}: bindingSignature must be 128 lowercase hex chars`);
     }
   };
+  const optionalText = (key: string, max: number): void => {
+    if (!(key in payload)) return;
+    const v = payload[key];
+    if (typeof v !== 'string' || v.length === 0 || [...v].length > max) {
+      throw new LogError(`${entryType}: ${key} must be a non-empty string of at most ${max} characters`);
+    }
+  };
   switch (entryType) {
     case 'LEDGER_OPEN':
-      expect(['name', 'accountPublicKey', 'bindingSignature'], ['name', 'accountPublicKey', 'bindingSignature']);
+      expect(
+        ['name', 'accountPublicKey', 'bindingSignature', 'displayName', 'description'],
+        ['name', 'accountPublicKey', 'bindingSignature'],
+      );
       if (typeof payload['name'] !== 'string') throw new LogError('LEDGER_OPEN: name must be a string');
+      optionalText('displayName', MAX_DISPLAY_NAME);
+      optionalText('description', MAX_NOTE);
       requireBindingFields();
       return;
     case 'MEMBER_JOIN':
-      expect(['accountPublicKey', 'bindingSignature'], ['accountPublicKey', 'bindingSignature']);
+      expect(['accountPublicKey', 'bindingSignature', 'displayName'], ['accountPublicKey', 'bindingSignature']);
+      optionalText('displayName', MAX_DISPLAY_NAME);
       requireBindingFields();
       return;
+    case 'EXPENSE_RECORD': {
+      expect(
+        ['title', 'total', 'method', 'shares', 'category', 'note', 'spentOn'],
+        ['title', 'total', 'method', 'shares'],
+      );
+      optionalText('title', MAX_TITLE);
+      if (typeof payload['title'] !== 'string') throw new LogError('EXPENSE_RECORD: title must be a string');
+      optionalText('category', MAX_CATEGORY);
+      optionalText('note', MAX_NOTE);
+      if ('spentOn' in payload && (typeof payload['spentOn'] !== 'string' || !DATE_RE.test(payload['spentOn']))) {
+        throw new LogError('EXPENSE_RECORD: spentOn must be a YYYY-MM-DD date');
+      }
+      if (!SPLIT_METHODS.has(payload['method'] as string)) {
+        throw new LogError('EXPENSE_RECORD: method must be equal, exact or percent');
+      }
+      const total = parseLuna(payload['total'], 'EXPENSE_RECORD: total');
+      const shares = payload['shares'];
+      if (!Array.isArray(shares) || shares.length === 0 || shares.length > MAX_SHARES) {
+        throw new LogError(`EXPENSE_RECORD: shares must be a non-empty array of at most ${MAX_SHARES}`);
+      }
+      let sum = 0n;
+      let prev = '';
+      for (const share of shares) {
+        if (typeof share !== 'object' || share === null || Array.isArray(share)) {
+          throw new LogError('EXPENSE_RECORD: each share must be an object');
+        }
+        const keysOf = Object.keys(share).sort().join(',');
+        if (keysOf !== 'amount,member') throw new LogError('EXPENSE_RECORD: a share has exactly member and amount');
+        const { member, amount } = share as { member: unknown; amount: unknown };
+        if (typeof member !== 'string' || !ADDR_RE.test(member)) throw new LogError('EXPENSE_RECORD: bad share member');
+        if (member <= prev) throw new LogError('EXPENSE_RECORD: shares must be sorted by member and unique');
+        prev = member;
+        sum += parseLuna(amount, 'EXPENSE_RECORD: share amount');
+      }
+      if (sum !== total) throw new LogError(`EXPENSE_RECORD: shares sum to ${sum}, not the total ${total}`);
+      return;
+    }
+    case 'OBLIGATION_CANCEL':
+      expect(['proposeId', 'reason'], ['proposeId']);
+      if (typeof payload['proposeId'] !== 'string' || !HASH_RE.test(payload['proposeId'])) {
+        throw new LogError('CANCEL: proposeId must be a 32-byte entry ID hex');
+      }
+      optionalText('reason', MAX_NOTE);
+      return;
+    case 'PAYMENT_RECORD': {
+      expect(['recipient', 'amount', 'txHash', 'salt', 'network'], ['recipient', 'amount', 'txHash', 'salt', 'network']);
+      if (typeof payload['recipient'] !== 'string' || !ADDR_RE.test(payload['recipient'])) {
+        throw new LogError('PAYMENT_RECORD: bad recipient address');
+      }
+      parseLuna(payload['amount'], 'PAYMENT_RECORD: amount');
+      if (typeof payload['txHash'] !== 'string' || !HASH_RE.test(payload['txHash'])) {
+        throw new LogError('PAYMENT_RECORD: txHash must be 64 lowercase hex chars');
+      }
+      if (typeof payload['salt'] !== 'string' || !NONCE_RE.test(payload['salt'])) {
+        throw new LogError('PAYMENT_RECORD: salt must be 32 lowercase hex chars');
+      }
+      if (payload['network'] !== 5 && payload['network'] !== 24) {
+        throw new LogError('PAYMENT_RECORD: network must be 5 (testnet) or 24 (mainnet)');
+      }
+      return;
+    }
     case 'MEMBER_LEAVE':
       // Leaving carries no binding — the member is already registered, and the
       // shared purse-key guard proves the entry came from them.
@@ -331,7 +429,7 @@ export function validateEntry(entry: LogEntry): void {
 
 // --- replay -----------------------------------------------------------------
 
-export type ObligationStatus = 'PROPOSED' | 'ACCEPTED' | 'CONTESTED' | 'IN_ROUND';
+export type ObligationStatus = 'PROPOSED' | 'ACCEPTED' | 'CONTESTED' | 'IN_ROUND' | 'CANCELLED';
 
 /** Minimal accept facts needed to derive a round's anchor height (GAP 1). */
 export interface AcceptedHeightRef {
@@ -377,6 +475,46 @@ export interface ObligationRecord {
   acceptClock: number | null;
   /** Round that consumed this obligation, if any. */
   round: number | null;
+  /** The EXPENSE_RECORD this share came from, or null for a direct proposal. */
+  expenseId: string | null;
+  /** logicalClock of the entry that created the obligation. */
+  createdClock: number;
+}
+
+export interface ExpenseRecord {
+  expenseId: string;
+  payer: AddressHex;
+  title: string;
+  total: bigint;
+  method: SplitMethod;
+  category: string | null;
+  note: string | null;
+  spentOn: string | null;
+  shares: { member: AddressHex; amount: bigint; proposeId: string | null }[];
+  logicalClock: number;
+}
+
+/**
+ * A payer's signed claim that a chain transaction settles part of what they
+ * owe. A claim moves no balance by itself: callers count it only once the
+ * transaction is independently verified on chain (see core/settle).
+ */
+export interface PaymentClaim {
+  entryId: string;
+  payer: AddressHex;
+  recipient: AddressHex;
+  amount: bigint;
+  txHash: string;
+  /** Short reference derived from (payer, salt); the payment's memo carries it. */
+  ref: string;
+  network: 5 | 24;
+  logicalClock: number;
+}
+
+export interface MemberProfile {
+  address: AddressHex;
+  displayName: string | null;
+  joinedClock: number;
 }
 
 export interface OpenRound {
@@ -424,6 +562,12 @@ export interface LedgerState {
   lastClosedRound: number;
   /** Contextually invalid entries, skipped deterministically. */
   ignored: IgnoredEntry[];
+  description: string | null;
+  /** Display names chosen at join, by address. Names are self-asserted, never identity. */
+  profiles: MemberProfile[];
+  expenses: ExpenseRecord[];
+  /** Payment claims in canonical order; at most one claim per transaction hash. */
+  payments: PaymentClaim[];
 }
 
 interface SortableEntry {
@@ -468,6 +612,20 @@ export function replayState(entries: LogEntry[]): LedgerState {
   let genesisHash: string | null = null;
   let openRound: OpenRound | null = null;
   let lastClosedRound = 0;
+  let description: string | null = null;
+  const profiles = new Map<AddressHex, MemberProfile>();
+  const expenses: ExpenseRecord[] = [];
+  const payments: PaymentClaim[] = [];
+  const claimedTx = new Set<string>();
+
+  const recordProfile = (e: LogEntry): void => {
+    const name = e.payload['displayName'];
+    profiles.set(e.authorAddress, {
+      address: e.authorAddress,
+      displayName: typeof name === 'string' ? name : null,
+      joinedClock: e.logicalClock,
+    });
+  };
 
   const skip = (s: SortableEntry, reason: string): void => {
     ignored.push({ id: s.id, entryType: s.entry.entryType, reason });
@@ -519,8 +677,10 @@ export function replayState(entries: LogEntry[]): LedgerState {
           break;
         }
         ledgerName = e.payload['name'] as string;
+        description = (e.payload['description'] as string | undefined) ?? null;
         genesisHash = s.hash;
         members.set(e.authorAddress, e.pursePublicKey);
+        recordProfile(e);
         break;
       }
       case 'MEMBER_JOIN': {
@@ -537,6 +697,7 @@ export function replayState(entries: LogEntry[]): LedgerState {
         // one: it registers whatever purse key this fresh attestation names.
         members.set(e.authorAddress, e.pursePublicKey);
         departed.delete(e.authorAddress);
+        recordProfile(e);
         break;
       }
       case 'MEMBER_LEAVE': {
@@ -576,6 +737,107 @@ export function replayState(entries: LogEntry[]): LedgerState {
           acceptObservedHeight: null,
           acceptClock: null,
           round: null,
+          expenseId: null,
+          createdClock: e.logicalClock,
+        });
+        break;
+      }
+      case 'EXPENSE_RECORD': {
+        if (!isMember) {
+          skip(s, 'author is not a member');
+          break;
+        }
+        const rawShares = e.payload['shares'] as { member: AddressHex; amount: string }[];
+        if (rawShares.some((sh) => !members.has(sh.member) || departed.has(sh.member))) {
+          skip(s, 'expense names someone who is not an active member');
+          break;
+        }
+        if (!rawShares.some((sh) => sh.member !== e.authorAddress)) {
+          skip(s, 'expense has no share owed by anyone but the payer');
+          break;
+        }
+        const shares = rawShares.map((sh) => {
+          const amount = BigInt(sh.amount);
+          if (sh.member === e.authorAddress) return { member: sh.member, amount, proposeId: null };
+          const proposeId = expenseShareId(s.id, sh.member);
+          obligations.set(proposeId, {
+            proposeId,
+            debtor: sh.member,
+            creditor: e.authorAddress,
+            amount,
+            memo: e.payload['title'] as string,
+            status: 'PROPOSED',
+            acceptId: null,
+            acceptObservedHeight: null,
+            acceptClock: null,
+            round: null,
+            expenseId: s.id,
+            createdClock: e.logicalClock,
+          });
+          return { member: sh.member, amount, proposeId };
+        });
+        expenses.push({
+          expenseId: s.id,
+          payer: e.authorAddress,
+          title: e.payload['title'] as string,
+          total: BigInt(e.payload['total'] as string),
+          method: e.payload['method'] as SplitMethod,
+          category: (e.payload['category'] as string | undefined) ?? null,
+          note: (e.payload['note'] as string | undefined) ?? null,
+          spentOn: (e.payload['spentOn'] as string | undefined) ?? null,
+          shares,
+          logicalClock: e.logicalClock,
+        });
+        break;
+      }
+      case 'OBLIGATION_CANCEL': {
+        const ob = obligations.get(e.payload['proposeId'] as string);
+        if (!ob) {
+          skip(s, 'cancel references an unknown obligation');
+          break;
+        }
+        // Only the creditor can withdraw or forgive: that can only ever reduce
+        // what someone else owes, so it needs nobody else's consent.
+        if (e.authorAddress !== ob.creditor) {
+          skip(s, 'only the creditor can cancel an obligation');
+          break;
+        }
+        if (ob.status === 'IN_ROUND' || ob.status === 'CANCELLED') {
+          skip(s, `obligation is ${ob.status}, not cancellable`);
+          break;
+        }
+        ob.status = 'CANCELLED';
+        break;
+      }
+      case 'PAYMENT_RECORD': {
+        if (!isMember) {
+          skip(s, 'author is not a member');
+          break;
+        }
+        const recipient = e.payload['recipient'] as AddressHex;
+        if (!members.has(recipient)) {
+          skip(s, 'payment recipient is not a member');
+          break;
+        }
+        if (recipient === e.authorAddress) {
+          skip(s, 'a member cannot pay themselves');
+          break;
+        }
+        const txHash = e.payload['txHash'] as string;
+        if (claimedTx.has(txHash)) {
+          skip(s, 'transaction is already claimed by an earlier payment record');
+          break;
+        }
+        claimedTx.add(txHash);
+        payments.push({
+          entryId: s.id,
+          payer: e.authorAddress,
+          recipient,
+          amount: BigInt(e.payload['amount'] as string),
+          txHash,
+          ref: paymentRef(e.authorAddress, e.payload['salt'] as string),
+          network: e.payload['network'] as 5 | 24,
+          logicalClock: e.logicalClock,
         });
         break;
       }
@@ -718,7 +980,53 @@ export function replayState(entries: LogEntry[]): LedgerState {
     openRound,
     lastClosedRound,
     ignored,
+    description,
+    profiles: [...profiles.values()].sort((a, b) => (a.address < b.address ? -1 : 1)),
+    expenses,
+    payments,
   };
+}
+
+const EXPENSE_SHARE_DOMAIN = utf8('tally-expense-share-v1');
+const PAYMENT_REF_DOMAIN = utf8('tally-payment-ref-v1');
+const REF_ALPHABET = 'abcdefghijklmnopqrstuvwxyz234567';
+
+/** The obligation id for one member's share of an expense: content-derived, so every device agrees. */
+export function expenseShareId(expenseEntryId: string, member: AddressHex): string {
+  return bytesToHex(
+    Hash.computeBlake2b(concatBytes(EXPENSE_SHARE_DOMAIN, hexToBytes(expenseEntryId), hexToBytes(member))),
+  );
+}
+
+/**
+ * The 16-character payment reference a payer commits to before sending. It is
+ * derived from the payer's address, so nobody else can claim a payment whose
+ * memo carries it: a claim must reveal a salt that hashes to the reference
+ * together with the claimant's own address.
+ */
+export function paymentRef(payer: AddressHex, saltHex: string): string {
+  const digest = Hash.computeBlake2b(concatBytes(PAYMENT_REF_DOMAIN, hexToBytes(payer), hexToBytes(saltHex)));
+  let bits = 0n;
+  for (const b of digest.subarray(0, 10)) bits = (bits << 8n) | BigInt(b);
+  let out = '';
+  for (let i = 0; i < 16; i++) {
+    out = REF_ALPHABET[Number(bits & 31n)] + out;
+    bits >>= 5n;
+  }
+  return out;
+}
+
+/** The public memo a Tally payment carries: `TLY2.<ledger8>.<ref16>`, 30 bytes. */
+export function paymentMemo(genesisHash: string, ref: string): string {
+  const tag = hexToBytes(genesisHash).subarray(0, 5);
+  let bits = 0n;
+  for (const b of tag) bits = (bits << 8n) | BigInt(b);
+  let ledger8 = '';
+  for (let i = 0; i < 8; i++) {
+    ledger8 = REF_ALPHABET[Number(bits & 31n)] + ledger8;
+    bits >>= 5n;
+  }
+  return `TLY2.${ledger8}.${ref}`;
 }
 
 // --- linear log, head hash, fork detection ----------------------------------

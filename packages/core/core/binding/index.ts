@@ -85,6 +85,33 @@ export function bindingMessage(accountAddress: AddressHex, pursePublicKey: strin
   return `${BINDING_MESSAGE_VERSION}\naccount: ${friendly}\npurse: ${pursePublicKey}`;
 }
 
+/** Opens the v2 binding message. v2 is what new members sign; v1 still verifies for old logs. */
+export const BINDING_MESSAGE_V2 = 'Sign in to Tally';
+
+/**
+ * The v2 binding message, written for the person reading it in the Nimiq Pay
+ * signing dialog. It states what the signature authorises and what it cannot
+ * do, then names the account and the device key exactly.
+ */
+export function bindingMessageV2(accountAddress: AddressHex, sessionPublicKey: string): string {
+  const friendly = new Address(hexToBytes(accountAddress)).toUserFriendlyAddress();
+  return [
+    BINDING_MESSAGE_V2,
+    '',
+    'This lets this device record your agreements in shared Tally tabs.',
+    'It cannot move or spend your NIM.',
+    '',
+    `Account: ${friendly}`,
+    `Device key: ${sessionPublicKey}`,
+  ].join('\n');
+}
+
+export type BindingVersion = 1 | 2;
+
+function bindingMessageFor(version: BindingVersion, accountAddress: AddressHex, pursePublicKey: string): string {
+  return version === 2 ? bindingMessageV2(accountAddress, pursePublicKey) : bindingMessage(accountAddress, pursePublicKey);
+}
+
 /** The digest Nimiq Pay actually signs for a message (sha256 over prefix+len+msg). */
 export function nimiqSignedMessageDigest(message: string): Uint8Array {
   const msg = utf8(message);
@@ -113,8 +140,10 @@ export function verifyBindingAttestation(att: BindingAttestation): boolean {
   try {
     const accountPk = PublicKey.deserialize(hexToBytes(att.accountPublicKey));
     if (bytesToHex(accountPk.toAddress().serialize()) !== att.accountAddress) return false;
-    const digest = nimiqSignedMessageDigest(bindingMessage(att.accountAddress, att.pursePublicKey));
-    return accountPk.verify(Signature.deserialize(hexToBytes(att.bindingSignature)), digest);
+    const signature = Signature.deserialize(hexToBytes(att.bindingSignature));
+    return ([2, 1] as const).some((version) =>
+      accountPk.verify(signature, nimiqSignedMessageDigest(bindingMessageFor(version, att.accountAddress, att.pursePublicKey))),
+    );
   } catch {
     return false;
   }
@@ -126,11 +155,15 @@ export function verifyBindingAttestation(att: BindingAttestation): boolean {
  * holds the account key; it obtains the signature from the SDK and assembles
  * the attestation from that. Used by tests and to pin the exact byte scheme.
  */
-export function createBindingAttestation(accountKeyPair: KeyPair, pursePublicKey: string): BindingAttestation {
+export function createBindingAttestation(
+  accountKeyPair: KeyPair,
+  pursePublicKey: string,
+  version: BindingVersion = 1,
+): BindingAttestation {
   if (!HEX64.test(pursePublicKey)) throw new Error('pursePublicKey must be 64 lowercase hex chars');
   const accountAddress = bytesToHex(accountKeyPair.toAddress().serialize());
   const accountPublicKey = bytesToHex(accountKeyPair.publicKey.serialize());
-  const digest = nimiqSignedMessageDigest(bindingMessage(accountAddress, pursePublicKey));
+  const digest = nimiqSignedMessageDigest(bindingMessageFor(version, accountAddress, pursePublicKey));
   const bindingSignature = bytesToHex(accountKeyPair.sign(digest).serialize());
   return { accountAddress, accountPublicKey, pursePublicKey, bindingSignature };
 }
