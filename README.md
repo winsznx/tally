@@ -2,7 +2,16 @@
 
 **Shared expenses. Actually settled.** A Nimiq Pay Mini App that keeps one tab for a group, gets every share agreed by the person who owes it, cuts circular debts down to the fewest NIM payments, and only marks a payment paid once it has found it on the Nimiq network.
 
-**[Open the app](https://tally-neon-chi.vercel.app)** · Nimiq mainnet · MIT
+**[Open the app](https://tally-neon-chi.vercel.app)** · **[Watch the 2-minute demo](https://youtu.be/-h1qpekaeXE)** · Nimiq mainnet · MIT
+
+<p>
+<img src="docs/media/04-agree-to-share-ipad.jpg" alt="Agree to your share: you agree you owe 1 NIM to TJ for Dinner at Jos" width="200">
+<img src="docs/media/06-nimiq-pay-confirm-transaction-ipad.jpg" alt="Nimiq Pay's own Confirm Transaction prompt with recipient, 1 NIM and Tally's reference" width="200">
+<img src="docs/media/07-payment-timeline-ipad.jpg" alt="Payment timeline: approved in Nimiq Pay, sent to the network, seen in a block" width="200">
+<img src="docs/media/09-receipt-paid-confirmed-iphone.jpg" alt="Receipt: Paid, confirmed on Nimiq, 1 NIM, block 66,651,867" width="200">
+</p>
+
+Real screens from two Nimiq Pay wallets on mainnet: agreeing to a share, Nimiq Pay's own approval prompt, the payment timeline, and the confirmed receipt.
 
 ## Who it is for
 
@@ -33,13 +42,14 @@ The worked example Tally has always published still holds and is a fixed test: A
 
 ## Verified on mainnet
 
-On 11 November 2026 two Nimiq Pay wallets created a tab, joined it, recorded a shared expense, agreed to the share and settled it from the deployed app:
+On 11 November 2026 two Nimiq Pay wallets (Nimiq Pay 2.23.0) used the deployed app on mainnet: created a tab, joined it, recorded shared expenses, agreed to the shares and settled them.
 
-- Transaction [`457faf49…3f075205`](https://nimiq.watch/#457faf4916dc9661fe63799fb3e678c0f532cae16220c7c5e3a997663f075205): 0.5 NIM, fee 0, sent from the payer's Nimiq Pay HTLC, memo `TLY2.vcdzucs5.eazfimihzxfho3er` intact.
-- Intent saved 22:18:39 UTC, in a block 3 s later, confirmed by Tally after macro-block finality at 22:19:40 UTC.
-- The app's own chain check and the server's independent reconciler both reached `confirmed`.
+| Payment | Amount | Sent from | Memo on chain | Result |
+| --- | --- | --- | --- | --- |
+| [`457faf49…3f075205`](https://nimiq.watch/#457faf4916dc9661fe63799fb3e678c0f532cae16220c7c5e3a997663f075205) | 0.5 NIM, fee 0 | payer's Nimiq Pay HTLC | `TLY2.vcdzucs5.eazfimihzxfho3er` | in a block 3 s after the intent was saved, confirmed after finality about 61 s later |
+| [`6bfdfdfe…82a993d9`](https://nimiq.watch/#6bfdfdfef71c66c3d5c590aa904c974e9f10bd428f8b59a997c6371582a993d9) | 1 NIM, fee 0 | payer's Nimiq Pay HTLC | `TLY2.vcdzucs5.fzi2u3cd7rjzwr2u` | block 66,651,867, shown as paid on both devices after finality ([demo](https://youtu.be/-h1qpekaeXE)) |
 
-That is one end-to-end payment between two of the builder's own wallets. It shows the path works; it is not usage data.
+Both payments were confirmed independently by each device's own chain check and by the server's reconciler. These are payments between the builder's own wallets: they show the path works end to end, not usage.
 
 ## Run it locally
 
