@@ -1,7 +1,7 @@
 {
   "name": "tally",
   "version": "0.1.0",
-  "description": "Tally — a shared ledger of obligations that nets continuously, clears in NIM without confirmation dialogs, and anchors every settlement on-chain. Nimiq Pay Mini App.",
+  "description": "Tally: shared expenses, actually settled. Record, agree, and pay the fewest NIM transfers, verified on the Nimiq network. Nimiq Pay Mini App.",
   "private": true,
   "license": "MIT",
   "type": "module",
