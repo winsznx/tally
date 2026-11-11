@@ -1,0 +1,11 @@
+**/node_modules
+**/dist
+**/.env
+**/.env.*
+**/*.log
+.git
+.wrangler
+.demo-seed
+.claude
+.agents
+internal
