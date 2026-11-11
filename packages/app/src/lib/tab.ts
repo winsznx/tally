@@ -29,6 +29,8 @@ export interface TabSnapshot {
   sync: SyncStatus;
   syncError: string | null;
   lastSyncedAt: number | null;
+  /** When the server first stored each entry, by entry hash. Absent while an entry waits to sync. */
+  receivedAt: ReadonlyMap<string, number>;
   state: LedgerState;
   verifications: ReadonlyMap<string, Verification & { checkedAt: number; blockNumber: number | null; timestamp: number | null }>;
   settlement: SettlementView;
@@ -37,6 +39,7 @@ export interface TabSnapshot {
 const entriesKey = (id: string): string => `tally.v2.tab.${id}.entries`;
 const pendingKey = (id: string): string => `tally.v2.tab.${id}.pending`;
 const verifKey = (id: string): string => `tally.v2.tab.${id}.verifications`;
+const receivedKey = (id: string): string => `tally.v2.tab.${id}.received`;
 
 function randomHex(bytes: number): string {
   const b = new Uint8Array(bytes);
@@ -102,6 +105,7 @@ export class TabStore extends Observable<TabSnapshot> {
     const cached = (readJson<string[]>(entriesKey(tabId)) ?? []).map(verified).filter((e): e is LogEntry => e !== null);
     const pending = (readJson<string[]>(pendingKey(tabId)) ?? []).map(verified).filter((e): e is LogEntry => e !== null);
     const verifications = new Map(readJson<StoredVerification[]>(verifKey(tabId)) ?? []);
+    const receivedAt = new Map(readJson<[string, number][]>(receivedKey(tabId)) ?? []);
     const entries = mergeEntries(cached, pending);
     super({
       tabId,
@@ -111,6 +115,7 @@ export class TabStore extends Observable<TabSnapshot> {
       sync: 'loading',
       syncError: null,
       lastSyncedAt: null,
+      receivedAt,
       verifications,
       ...derive(entries, verifications),
     });
@@ -141,8 +146,17 @@ export class TabStore extends Observable<TabSnapshot> {
     this.patch({ sync: this.state.entries.length ? 'syncing' : 'loading' });
     try {
       const { rows } = await api.getAllEntries(this.tabId);
-      const remote = rows.map((r) => verified(r.entryJson)).filter((e): e is LogEntry => e !== null);
-      this.#replace(mergeEntries(this.state.entries, remote), this.state.pending);
+      const receivedAt = new Map(this.state.receivedAt);
+      const remote: LogEntry[] = [];
+      for (const r of rows) {
+        const e = verified(r.entryJson);
+        if (!e) continue;
+        remote.push(e);
+        const at = Date.parse(r.receivedAt);
+        if (Number.isFinite(at)) receivedAt.set(entryHash(e), at);
+      }
+      writeJson(receivedKey(this.tabId), [...receivedAt.entries()]);
+      this.#replace(mergeEntries(this.state.entries, remote), this.state.pending, { receivedAt });
       await this.#flush();
       this.patch({ sync: this.state.pending.length ? 'offline' : 'synced', syncError: null, lastSyncedAt: Date.now() });
     } catch (e) {
