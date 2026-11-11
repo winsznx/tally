@@ -12,7 +12,7 @@ services:
     restart: unless-stopped
     env_file: .env
     environment:
-      DATABASE_URL: postgresql://tally:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@db:5432/tally
+      DATABASE_URL: postgresql://tally:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@tally-db:5432/tally
       PORT: "8080"
       HOST: 0.0.0.0
     ports:
@@ -33,6 +33,10 @@ services:
   db:
     image: postgres:16-alpine
     restart: unless-stopped
+    # A unique name: on a shared proxy network another project's "db" can shadow ours.
+    networks:
+      default:
+        aliases: [tally-db]
     environment:
       POSTGRES_USER: tally
       POSTGRES_DB: tally

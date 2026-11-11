@@ -1,0 +1,15 @@
+# Joins the API to an existing reverse-proxy network (for a shared Caddy or
+# Traefik container that terminates TLS for several apps on one host):
+#   docker compose -f docker-compose.yml -f docker-compose.proxy.yml up -d --build
+# The proxy then reaches the API at tally-api:8080.
+services:
+  api:
+    networks:
+      default: {}
+      proxy:
+        aliases: [tally-api]
+
+networks:
+  proxy:
+    external: true
+    name: ${PROXY_NETWORK:-compose_default}
